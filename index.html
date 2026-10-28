@@ -785,20 +785,20 @@
             { code: 'GER', country: 'Германия', flag: '🇩🇪', pattern: '+49 15X XXXXXXXX', formatDigits: 9, dropWeight: 2 },
 
             // Легендарные коды стран
-            { code: 'TG_LEG', country: 'Того', flag: '🇹🇬', pattern: '+228 XX XX XX XX', formatDigits: 8, dropWeight: 0.1, forceRarity: 'legendary' },
-            { code: 'SO_LEG', country: 'Сомали', flag: '🇸🇴', pattern: '+252 61 XXX XXXX', formatDigits: 7, dropWeight: 0.1, forceRarity: 'legendary' },
-            { code: 'SL_LEG', country: 'Сьерра-Леоне', flag: '🇸🇱', pattern: '+232 XX XXXXXX', formatDigits: 8, dropWeight: 0.1, forceRarity: 'legendary' },
-            { code: 'MA_LEG', country: 'Марокко', flag: '🇲🇦', pattern: '+212 6XX XXXXXX', formatDigits: 8, dropWeight: 0.1, forceRarity: 'legendary' },
-            { code: 'MX_LEG', country: 'Мексика', flag: '🇲🇽', pattern: '+52 XXX XXX XXXX', formatDigits: 10, dropWeight: 0.1, forceRarity: 'legendary' },
+            { code: 'TG_LEG', country: 'Того', flag: '🇹🇬', pattern: '+228 XX XX XX XX', formatDigits: 8, dropWeight: 0.012, forceRarity: 'legendary' },
+            { code: 'SO_LEG', country: 'Сомали', flag: '🇸🇴', pattern: '+252 61 XXX XXXX', formatDigits: 7, dropWeight: 0.012, forceRarity: 'legendary' },
+            { code: 'SL_LEG', country: 'Сьерра-Леоне', flag: '🇸🇱', pattern: '+232 XX XXXXXX', formatDigits: 8, dropWeight: 0.012, forceRarity: 'legendary' },
+            { code: 'MA_LEG', country: 'Марокко', flag: '🇲🇦', pattern: '+212 6XX XXXXXX', formatDigits: 8, dropWeight: 0.012, forceRarity: 'legendary' },
+            { code: 'MX_LEG', country: 'Мексика', flag: '🇲🇽', pattern: '+52 XXX XXX XXXX', formatDigits: 10, dropWeight: 0.012, forceRarity: 'legendary' },
 
             // Мифические коды
-            { code: 'MR_MYTH', country: 'Мавритания', flag: '🇲🇷', pattern: '+222 XX XX XX XX', formatDigits: 8, dropWeight: 0.02, forceRarity: 'mythic' },
-            { code: 'Z_MYTH', country: 'Секретная Зона (+0)', flag: '🛰️', pattern: '+0 XXXX XXXX', formatDigits: 8, dropWeight: 0.015, forceRarity: 'mythic' },
-            { code: 'KG_MYTH', country: 'Кыргызстан (+996)', flag: '🇰🇬', pattern: '+996 XXX XXX XXX', formatDigits: 9, dropWeight: 0.02, forceRarity: 'mythic' },
-            { code: 'CZ_MYTH', country: 'Чехия (+420)', flag: '🇨🇿', pattern: '+420 XXX XXX XXX', formatDigits: 9, dropWeight: 0.02, forceRarity: 'mythic' },
+            { code: 'MR_MYTH', country: 'Мавритания', flag: '🇲🇷', pattern: '+222 XX XX XX XX', formatDigits: 8, dropWeight: 0.002, forceRarity: 'mythic' },
+            { code: 'Z_MYTH', country: 'Секретная Зона (+0)', flag: '🛰️', pattern: '+0 XXXX XXXX', formatDigits: 8, dropWeight: 0.0015, forceRarity: 'mythic' },
+            { code: 'KG_MYTH', country: 'Кыргызстан (+996)', flag: '🇰🇬', pattern: '+996 XXX XXX XXX', formatDigits: 9, dropWeight: 0.002, forceRarity: 'mythic' },
+            { code: 'CZ_MYTH', country: 'Чехия (+420)', flag: '🇨🇿', pattern: '+420 XXX XXX XXX', formatDigits: 9, dropWeight: 0.002, forceRarity: 'mythic' },
 
             // Сверхредкие экзотические серии
-            { code: 'MYTH', country: 'Мифический (+880)', flag: '🌐', pattern: '+880 XXXX XXXX', formatDigits: 8, dropWeight: 0.01, forceRarity: 'mythic' },
+            { code: 'MYTH', country: 'Мифический (+880)', flag: '🌐', pattern: '+880 XXXX XXXX', formatDigits: 8, dropWeight: 0.001, forceRarity: 'mythic' },
             { code: 'ULT', country: 'Telegram (+888)', flag: '🌐', pattern: '+888 XXXX XXXX', formatDigits: 8, dropWeight: 0.003, forceRarity: 'ultra' }
         ];
 
@@ -885,12 +885,25 @@
                         rarityKey = 'mythic';
                     } else if (score >= 95) {
                         rarityKey = 'legendary';
-                    } else if (score >= 55) { 
+                    } else if (score >= 55) {
                         rarityKey = 'epic';
                     } else if (score >= 12) {
                         rarityKey = 'rare';
                     } else if (score >= 3) {
                         rarityKey = 'uncommon';
+                    }
+                }
+
+                // Редкие уровни дополнительно проходят отдельный шанс.
+                // Ориентировочно: эпик 1/250, легендарный 1/2000, мифик 1/10000.
+                // Принудительные редкости из специальных пулов сохраняются.
+                if (!plan.forceRarity) {
+                    if (rarityKey === 'mythic' && Math.random() >= 1 / 10000) {
+                        rarityKey = 'rare';
+                    } else if (rarityKey === 'legendary' && Math.random() >= 1 / 2000) {
+                        rarityKey = 'rare';
+                    } else if (rarityKey === 'epic' && Math.random() >= 1 / 250) {
+                        rarityKey = 'rare';
                     }
                 }
 
