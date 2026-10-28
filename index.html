@@ -104,13 +104,13 @@
     </header>
 
     <!-- MAIN INTERACTIVE DROP AREA -->
-    <main class="relative flex-1 max-w-4xl mx-auto w-full flex flex-col justify-center items-center px-4 overflow-hidden">
+    <main class="relative flex-1 min-h-0 max-w-4xl mx-auto w-full flex flex-col justify-center items-center overflow-hidden">
         
         <!-- DYNAMIC BACKGROUND GLOW FOR DROPS -->
         <div id="drop-bg-glow" class="absolute inset-0 pointer-events-none opacity-30 blur-3xl transition-all duration-700"></div>
 
         <!-- SECTION: TAP TAP DROP GENERATOR -->
-        <section id="sec-generator" onclick="app.handleTapToOpen()" class="w-full h-full flex flex-col justify-between items-center py-6 cursor-pointer relative z-10">
+        <section id="sec-generator" onpointerdown="app.handleGeneratorPointerDown(event)" onpointerup="app.handleGeneratorPointerUp(event)" onpointercancel="app.handleGeneratorPointerCancel(event)" style="touch-action: manipulation; user-select:none" class="absolute inset-0 flex flex-col justify-between items-center px-4 py-6 cursor-pointer relative z-10">
             
             <!-- TOP STATS OR DROPPED NOTICE -->
             <div class="w-full flex justify-between items-center px-2 text-xs text-slate-400 font-semibold">
@@ -172,7 +172,7 @@
                     </div>
 
                     <!-- QUICK ACTIONS FOR DROPPED ITEM -->
-                    <div id="drop-action-buttons" class="flex items-center justify-between px-2 text-xs font-bold text-slate-400">
+                    <div id="drop-action-buttons" class="hidden flex items-center justify-between px-2 text-xs font-bold text-slate-400">
                         <button onclick="event.stopPropagation(); app.toggleCurrentDropFav()" id="btn-quick-fav" class="flex items-center gap-2 px-3 py-2 rounded-xl glass-panel hover:text-rose-400 transition">
                             <i class="fa-regular fa-heart"></i>
                             <span>В избранное</span>
@@ -186,13 +186,7 @@
             </div>
 
             <!-- BOTTOM BAR CONTROLS -->
-            <div class="w-full flex items-center justify-between gap-3 pt-4 border-t border-slate-900">
-                <!-- Drop Pool Indicator Button -->
-                <div class="flex-1 glass-panel px-4 py-3 rounded-2xl border border-slate-800/80 flex items-center justify-center gap-2.5">
-                    <span class="text-lg">🌍</span>
-                    <span class="font-bold text-xs text-slate-300">Пул: Все страны (Рандом)</span>
-                </div>
-
+            <div class="w-full flex items-center justify-end gap-3 pt-4 border-t border-slate-900">
                 <!-- Auto Clicker Toggle Button -->
                 <button id="btn-auto-click" onclick="event.stopPropagation(); app.toggleAutoClicker()" class="glass-panel px-5 py-3 rounded-2xl border border-slate-800/80 font-bold text-xs text-slate-300 hover:text-white transition active:scale-95 flex items-center gap-2">
                     <i class="fa-solid fa-bolt text-amber-400"></i>
@@ -1041,6 +1035,8 @@
                 this.activeTab = 'generator';
 
                 this.isRevealing = false;
+                this.pressTimers = new Map();
+                this.longPressPointers = new Set();
                 this.typingTimeout = null;
                 this.priceCounterInterval = null;
 
@@ -1579,6 +1575,49 @@
                 this.showToast('Главный номер профиля обновлен!', 'success');
             }
 
+            handleGeneratorPointerDown(event) {
+                if (event.pointerType === 'mouse' && event.button !== 0) return;
+                if (event.target.closest('button, a, input, select, textarea')) return;
+
+                const pointerId = event.pointerId;
+                const onNumber = event.target.closest('#phone-pill-bg, #drop-number-display');
+                const resultVisible = !document.getElementById('drop-result-card').classList.contains('hidden');
+
+                // Long-press the displayed number to reveal its actions.
+                if (onNumber && resultVisible && this.currentDrop && !this.isRevealing) {
+                    const timer = setTimeout(() => {
+                        this.longPressPointers.add(pointerId);
+                        const actions = document.getElementById('drop-action-buttons');
+                        actions.classList.remove('hidden');
+                        actions.classList.remove('opacity-20', 'pointer-events-none');
+                    }, 500);
+                    this.pressTimers.set(pointerId, timer);
+                    return;
+                }
+
+                // Taps anywhere else in the play area open a new number; multitouch is supported.
+                this.handleTapToOpen();
+            }
+
+            handleGeneratorPointerUp(event) {
+                const pointerId = event.pointerId;
+                const timer = this.pressTimers.get(pointerId);
+                if (timer) {
+                    clearTimeout(timer);
+                    this.pressTimers.delete(pointerId);
+                    if (!this.longPressPointers.has(pointerId)) this.handleTapToOpen();
+                }
+                this.longPressPointers.delete(pointerId);
+            }
+
+            handleGeneratorPointerCancel(event) {
+                const pointerId = event.pointerId;
+                const timer = this.pressTimers.get(pointerId);
+                if (timer) clearTimeout(timer);
+                this.pressTimers.delete(pointerId);
+                this.longPressPointers.delete(pointerId);
+            }
+
             handleTapToOpen() {
                 if (this.isRevealing) return;
 
@@ -1621,6 +1660,7 @@
                 card.classList.remove('hidden');
 
                 document.getElementById('reveal-lock-banner').classList.add('hidden');
+                document.getElementById('drop-action-buttons').classList.add('hidden');
                 document.getElementById('drop-action-buttons').classList.remove('opacity-20', 'pointer-events-none');
 
                 document.getElementById('drop-rarity-text').textContent = item.rarity.name;
@@ -1695,7 +1735,8 @@
                         this.animatePriceCounter(item.price, () => {
                             this.isRevealing = false;
                             document.getElementById('reveal-lock-banner').classList.add('hidden');
-                            document.getElementById('drop-action-buttons').classList.remove('opacity-20', 'pointer-events-none');
+                            document.getElementById('drop-action-buttons').classList.add('hidden');
+                document.getElementById('drop-action-buttons').classList.remove('opacity-20', 'pointer-events-none');
                             document.getElementById('btn-main-menu').classList.remove('opacity-40', 'pointer-events-none');
                             document.getElementById('btn-auto-click').classList.remove('opacity-40', 'pointer-events-none');
 
@@ -2352,6 +2393,22 @@
         window.onload = function() {
             app = new App();
             app.init();
+
+            // Allow tapping anywhere on the screen, including blank areas outside the generator.
+            // Keep real controls and open overlays interactive, and avoid double-taps inside the generator.
+            document.addEventListener('pointerdown', function(event) {
+                if (!app || (event.pointerType === 'mouse' && event.button !== 0)) return;
+                const generator = document.getElementById('sec-generator');
+                if (generator && generator.contains(event.target)) return;
+                if (event.target.closest('button, a, input, select, textarea, [role="dialog"]')) return;
+                const menu = document.getElementById('sec-menu');
+                if (menu && !menu.classList.contains('hidden') && menu.contains(event.target)) return;
+                const overlays = document.querySelectorAll('.modal, [aria-modal="true"]');
+                for (const overlay of overlays) {
+                    if (!overlay.classList.contains('hidden') && overlay.contains(event.target)) return;
+                }
+                app.handleTapToOpen();
+            }, { passive: true });
         };
     </script>
 
