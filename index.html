@@ -75,6 +75,10 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0; }
         }
+    
+        @keyframes secretRainbow { 0% { background-position: 0% 50%; filter: hue-rotate(0deg); } 50% { background-position: 100% 50%; filter: hue-rotate(180deg); } 100% { background-position: 0% 50%; filter: hue-rotate(360deg); } }
+        .secret-rarity { background: linear-gradient(90deg, #ff3b3b, #ffb13b, #fff33b, #42ff70, #38d9ff, #8b5cff, #ff4fd8, #ff3b3b); background-size: 300% 300%; animation: secretRainbow 4s linear infinite; color: #fff !important; -webkit-background-clip: text; background-clip: text; text-shadow: 0 0 10px rgba(255,255,255,.18); }
+        .secret-rarity-bg { background: linear-gradient(120deg, #ff3b3b, #ffb13b, #fff33b, #42ff70, #38d9ff, #8b5cff, #ff4fd8); background-size: 300% 300%; animation: secretRainbow 4s linear infinite; }
     </style>
 
 <style id="disable-screen-zoom">
@@ -227,12 +231,6 @@
                     <p id="menu-profile-sub" class="text-[11px] text-slate-400">Настройка и статус</p>
                 </div>
 
-                <div onclick="app.switchTab('collection')" class="glass-card p-4 rounded-2xl cursor-pointer hover:border-cyan-500/50 transition">
-                    <i class="fa-solid fa-box-archive text-xl text-cyan-400 mb-2"></i>
-                    <h3 class="font-bold text-white text-sm">Коллекция</h3>
-                    <p id="menu-collection-sub" class="text-[11px] text-slate-400">0 / 50 номеров</p>
-                </div>
-
                 <div onclick="app.switchTab('market')" class="glass-card p-4 rounded-2xl cursor-pointer hover:border-purple-500/50 transition">
                     <div class="mb-2 w-6 h-6 flex items-center justify-center">
                         <svg class="w-full h-full text-purple-400 fill-current" viewBox="0 0 100 100">
@@ -272,6 +270,12 @@
                     <span><i class="fa-solid fa-gear mr-2"></i>Настройки</span>
                     <i class="fa-solid fa-chevron-right text-slate-600"></i>
                 </button>
+                <button onclick="app.switchTab('event')" class="w-full mt-3 py-5 px-5 rounded-2xl border border-fuchsia-400/50 bg-gradient-to-r from-slate-900 via-fuchsia-950/70 to-slate-900 text-left shadow-xl shadow-fuchsia-900/20 hover:border-fuchsia-300 transition">
+                    <div class="flex items-center justify-between gap-3">
+                        <div><div class="text-lg font-black text-white">🎁 ИВЕНТ</div><p class="text-xs text-fuchsia-200 mt-1">Ивент от разработчиков игры!!!</p></div>
+                        <i class="fa-solid fa-gift text-3xl text-fuchsia-300"></i>
+                    </div>
+                </button>
             </div>
         </section>
 
@@ -304,6 +308,25 @@
                         Выберите номер из Избранного
                     </span>
                 </div>
+            </div>
+
+            <!-- UNIQUE LOCAL PLAYER ID -->
+            <div class="glass-card p-3 rounded-xl border border-cyan-500/30 bg-cyan-950/10 flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-[10px] uppercase tracking-wider font-bold text-cyan-300">ID пользователя</p>
+                    <p id="profile-user-id" class="font-mono text-sm font-black text-white select-all break-all">PNT-...</p>
+                    <p class="text-[10px] text-slate-500 mt-1">ID этого профиля на данном устройстве</p>
+                </div>
+                <button onclick="app.copyProfileId()" class="shrink-0 px-3 py-2 rounded-lg glass-panel text-xs font-bold text-cyan-300"><i class="fa-regular fa-copy mr-1"></i>Копировать</button>
+            </div>
+
+            <!-- PROFILE GIFTS SHOWCASE -->
+            <div class="glass-card p-4 rounded-2xl border border-fuchsia-500/20 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-300">🎁 Витрина подарков <span id="profile-gifts-count" class="text-fuchsia-300 font-mono"></span></span>
+                    <button onclick="giftLink.openPicker()" class="text-fuchsia-300 hover:text-fuchsia-200 text-xs font-extrabold bg-fuchsia-500/10 px-2.5 py-1 rounded-lg border border-fuchsia-500/20"><i class="fa-solid fa-pen-to-square"></i> Выбрать</button>
+                </div>
+                <div id="profile-gifts-grid" class="grid grid-cols-3 gap-2"></div>
             </div>
 
             <!-- PROFILE EDIT FIELDS -->
@@ -346,7 +369,7 @@
         </section>
 
         <!-- SECTION: COLLECTION -->
-        <section id="sec-collection" class="hidden absolute inset-0 bg-[#0b0d14] z-30 p-4 overflow-y-auto space-y-4">
+        <section id="sec-collection" style="display:none!important" class="hidden absolute inset-0 bg-[#0b0d14] z-30 p-4 overflow-y-auto space-y-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <h2 class="text-xl font-black text-white">Моя Коллекция</h2>
@@ -419,6 +442,25 @@
 
             <div id="favorites-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-16">
                 <!-- Dynamic Items -->
+            </div>
+        </section>
+
+        <!-- SECTION: SECRET NUMBER EVENT -->
+        <section id="sec-event" class="hidden absolute inset-0 bg-[#0b0d14] z-30 p-4 overflow-y-auto space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div><h2 class="text-xl font-black text-white">🎁 Ивент от разработчиков</h2><p class="text-xs text-fuchsia-300 mt-1">Ивент от разработчиков игры!!!</p></div>
+                <button onclick="app.switchTab('menu')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-2 gap-3" id="event-secret-slots"></div>
+            <div class="glass-panel p-4 rounded-2xl border border-fuchsia-500/30 space-y-3 text-center">
+                <h3 class="text-lg font-black text-white">🎁 Тайны и награды от разработчиков</h3>
+                <p class="text-sm text-slate-200 leading-relaxed">Чтобы разблокировать скрытые ячейки и забрать ценные подарки от команды разработчиков, вам предстоит пройти небольшое испытание — <strong class="text-fuchsia-300">соберите 4 секретных номера</strong>.</p>
+                <p class="text-sm text-slate-200 leading-relaxed">Как только вся комбинация окажется у вас: 📬 <strong>Напишите нам Telegram:</strong> <a href="https://t.me/clipths" target="_blank" rel="noopener noreferrer" class="font-black text-cyan-300 underline underline-offset-2">@clipths</a> — и заберите свою награду!</p>
+            </div>
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800 space-y-2">
+                <h3 class="font-black text-white">Инструкция как собрать 4 номера</h3>
+                <p class="text-sm text-slate-300 leading-relaxed">Крутите генератор и надеетесь на свою удачу. Не нужно сохранять его в «Избранное» — просто нужно его продать, и система автоматически засчитает вам выпавший номер!</p>
+                <p class="text-xs text-slate-500">Секретные номера продаются за 1 $ каждый. Прогресс: <span id="event-secret-progress" class="text-cyan-300 font-bold">0 / 4</span></p>
             </div>
         </section>
 
@@ -508,7 +550,28 @@
             </div>
         </section>
 
+
+        <!-- SECTION: GIFTS ROULETTE (вторая игра) -->
+        <section id="sec-roulette" class="hidden absolute inset-0 bg-[#0b0d14] z-30 flex flex-col">
+            <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-800/80">
+                <h2 class="text-sm font-black text-white">🎰 Рулетка подарков</h2>
+                <button onclick="giftLink.openPicker()" class="text-fuchsia-300 text-xs font-extrabold px-2.5 py-1.5 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30">🎁 Подарки в профиль</button>
+            </div>
+            <iframe id="roulette-frame" title="Рулетка подарков" class="w-full flex-1 min-h-0 border-0 bg-slate-950"></iframe>
+        </section>
     </main>
+
+    <!-- BOTTOM MODE SWITCHER -->
+    <nav id="mode-nav" class="shrink-0 grid grid-cols-2 glass-panel border-t border-slate-800/80 z-40" style="padding-bottom:env(safe-area-inset-bottom,0px)">
+        <button id="nav-numbers" onclick="giftLink.goNumbers()" class="relative py-2.5 flex flex-col items-center gap-0.5 text-xs font-extrabold transition">
+            <span class="text-xl leading-none">📱</span><span>Номера</span>
+        </button>
+        <button id="nav-gifts" onclick="app.switchTab('roulette')" class="relative py-2.5 flex flex-col items-center gap-0.5 text-xs font-extrabold transition">
+            <span class="text-xl leading-none">🎁</span><span>Подарки</span>
+            <span id="nav-gifts-badge" class="hidden absolute top-1.5 left-1/2 ml-3 min-w-[18px] px-1 h-[18px] rounded-full bg-fuchsia-500 text-white text-[10px] leading-[18px] font-black text-center"></span>
+        </button>
+    </nav>
+
 
     <!-- SELECT PROFILE NUMBER MODAL -->
     <div id="select-profile-num-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
@@ -675,6 +738,22 @@
             </div>
 
             <div class="space-y-4">
+                <!-- TARGET PLAYER BY ID -->
+                <div class="glass-panel p-3.5 rounded-xl border border-cyan-500/40 space-y-3 bg-cyan-950/20">
+                    <p class="text-[11px] text-cyan-300 font-bold uppercase tracking-wider"><i class="fa-solid fa-fingerprint mr-1"></i>Награда игроку по ID</p>
+                    <input type="text" id="admin-target-user-id" placeholder="ID игрока (например PNT-ABC123-DEF456)" class="w-full bg-slate-900 border border-slate-800 text-xs font-mono px-3 py-2.5 rounded-xl text-white">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="number" min="1" id="admin-target-reward-amount" placeholder="Сумма" class="min-w-0 w-full bg-slate-900 border border-slate-800 text-xs px-3 py-2 rounded-xl text-white">
+                        <select id="admin-target-reward-type" class="min-w-0 w-full bg-slate-900 border border-slate-800 text-xs px-3 py-2 rounded-xl text-white"><option value="rub">Рубли (₽)</option><option value="usd">Доллары ($)</option></select>
+                    </div>
+                    <button onclick="app.adminGrantCurrencyById()" class="w-full py-2.5 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white font-extrabold text-xs">Выдать валюту по ID</button>
+                    <select id="admin-target-number-type" class="w-full bg-slate-900 border border-slate-800 text-xs px-3 py-2.5 rounded-xl text-white">
+                        <option value="legendary">Легендарный номер</option><option value="mythic">Мифический номер (+880)</option><option value="ultra">Экзотический номер (+888)</option><option value="secret">Секретный номер для ивента</option>
+                    </select>
+                    <button onclick="app.adminGrantNumberById()" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs">Выдать номер по ID</button>
+                    <p class="text-[10px] leading-relaxed text-slate-400">В этой HTML-версии ID и сохранения локальные: выдача сработает, только если введён ID профиля, открытого в этом же браузере. Для выдачи другим игрокам на разных устройствах нужен сервер/общая база.</p>
+                </div>
+
                 <!-- PROMOCODE CREATOR SECTION -->
                 <div class="glass-panel p-3.5 rounded-xl border border-purple-500/40 space-y-3 bg-purple-950/20">
                     <p class="text-[11px] text-purple-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
@@ -763,6 +842,19 @@
     </div>
 
     <!-- TOAST CONTAINER -->
+
+    <!-- GIFT PICKER MODAL -->
+    <div id="gift-picker-modal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-md rounded-2xl p-5 border border-fuchsia-500/30 shadow-2xl space-y-3 max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-extrabold text-white">🎁 Подарки в профиль <span id="gift-picker-count" class="text-xs text-fuchsia-300 font-mono ml-1"></span></h3>
+                <button onclick="giftLink.closePicker()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-400">Выберите до 6 подарков из инвентаря рулетки — они появятся в вашем профиле. Проданный подарок исчезнет из профиля.</p>
+            <div id="gift-picker-grid" class="grid grid-cols-3 gap-2"></div>
+        </div>
+    </div>
+
     <div id="toast-container" class="fixed top-16 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
     <!-- APPLICATION CODE -->
@@ -793,7 +885,12 @@
 
             // Сверхредкие экзотические серии
             { code: 'MYTH', country: 'Мифический (+880)', flag: '🌐', pattern: '+880 XXXX XXXX', formatDigits: 8, dropWeight: 0.001, forceRarity: 'mythic' },
-            { code: 'ULT', country: 'Telegram (+888)', flag: '🌐', pattern: '+888 XXXX XXXX', formatDigits: 8, dropWeight: 0.003, forceRarity: 'ultra' }
+            { code: 'ULT', country: 'Telegram (+888)', flag: '🌐', pattern: '+888 XXXX XXXX', formatDigits: 8, dropWeight: 0.003, forceRarity: 'ultra' },
+            // Секретные номера для ивента: общий шанс 0.0036%, немного выше +888
+            { code: 'SECRET_RU', country: 'Россия', flag: '🇷🇺', pattern: '+7 777 777 7777', formatDigits: 10, dropWeight: 0.0009, forceRarity: 'secret' },
+            { code: 'SECRET_MR', country: 'Мавритания', flag: '🇲🇷', pattern: '+222 22222222', formatDigits: 8, dropWeight: 0.0009, forceRarity: 'secret' },
+            { code: 'SECRET_US', country: 'США', flag: '🇺🇸', pattern: '+1 111 111 1111', formatDigits: 10, dropWeight: 0.0009, forceRarity: 'secret' },
+            { code: 'SECRET_UK', country: 'Великобритания', flag: '🇬🇧', pattern: '+44 444 444444', formatDigits: 9, dropWeight: 0.0009, forceRarity: 'secret' }
         ];
 
         // -------------------------------------------------------------
@@ -806,7 +903,8 @@
             epic: { id: 'epic', rank: 4, name: 'Эпический', color: '#a855f7', pillBg: 'bg-[#9333ea]', dots: 4, minPrice: 200000, maxPrice: 500000, isUnskippable: true },
             legendary: { id: 'legendary', rank: 5, name: 'Легендарный', color: '#eab308', pillBg: 'bg-[#d97706]', dots: 5, minPrice: 1000000, maxPrice: 5000000, isUnskippable: true },
             mythic: { id: 'mythic', rank: 6, name: 'Мифический', color: '#f43f5e', pillBg: 'bg-[#e11d48]', dots: 6, minPrice: 15000000, maxPrice: 50000000, isUnskippable: true },
-            ultra: { id: 'ultra', rank: 7, name: 'Экзотический (+888)', color: '#38a3b8', pillBg: 'bg-[#38a3b8]', dots: 7, minPrice: 100000000, maxPrice: 250000000, isUnskippable: true }
+            ultra: { id: 'ultra', rank: 7, name: 'Экзотический (+888)', color: '#38a3b8', pillBg: 'bg-[#38a3b8]', dots: 7, minPrice: 100000000, maxPrice: 250000000, isUnskippable: true },
+            secret: { id: 'secret', rank: 8, name: 'Секретная', color: 'rainbow', pillBg: 'secret-rarity-bg', dots: 8, minPrice: 1, maxPrice: 1, isUnskippable: true }
         };
 
         // -------------------------------------------------------------
@@ -826,6 +924,8 @@
                         patterns.push(`Легендарный код (${plan.country})`);
                     }
                 }
+
+                if (plan.forceRarity === 'secret') { patterns.push('Секретный номер для ивента'); score += 1000; }
 
                 if (plan.code === 'ULT') {
                     patterns.push('Telegram Экзотика (+888)');
@@ -877,9 +977,9 @@
                 if (!plan.forceRarity) {
                     if (score >= 150) {
                         rarityKey = 'mythic';
-                    } else if (score >= 95) {
+                    } else if (score >= 81) {
                         rarityKey = 'legendary';
-                    } else if (score >= 55) {
+                    } else if (score >= 60) {
                         rarityKey = 'epic';
                     } else if (score >= 12) {
                         rarityKey = 'rare';
@@ -904,7 +1004,7 @@
                 const rarity = RARITIES[rarityKey];
                 const range = rarity.maxPrice - rarity.minPrice;
                 const randomOffset = Math.random() * range;
-                const finalPrice = Math.round(rarity.minPrice + randomOffset);
+                const finalPrice = rarityKey === 'secret' ? 1 : Math.round(rarity.minPrice + randomOffset);
 
                 return {
                     finalPrice,
@@ -999,7 +1099,9 @@
                     usdBalance: 50,
                     collection: [],
                     favorites: [],
+                    eventSecretSold: [],
                     profile: {
+                        userId: '',
                         nickname: 'Тайкун Игрок',
                         bio: '',
                         dob: '',
@@ -1050,6 +1152,7 @@
                 this.renderCollection();
                 this.renderMarket();
                 this.renderFavorites();
+                this.renderEventUI();
                 this.renderQuestsUI();
                 this.renderUpgradesUI();
                 this.renderCloudUI();
@@ -1062,6 +1165,7 @@
                     try { 
                         const parsed = JSON.parse(saved);
                         if (parsed.balance === undefined) parsed.balance = 450000;
+                        if (!Array.isArray(parsed.eventSecretSold)) parsed.eventSecretSold = [];
                         if (!parsed.upgrades) parsed.upgrades = { autoSpeed: 0, maxCapacity: 50, maxFavCapacity: 3 };
                         if (parsed.upgrades.autoSpeed === undefined) parsed.upgrades.autoSpeed = 0;
                         if (!parsed.upgrades.maxCapacity) parsed.upgrades.maxCapacity = 50;
@@ -1095,6 +1199,12 @@
                         }
                         this.state = { ...this.state, ...parsed }; 
                     } catch (e) {}
+                }
+                if (!this.state.profile) this.state.profile = { nickname: 'Тайкун Игрок', bio: '', dob: '', regDate: new Date().toLocaleDateString('ru-RU'), selectedNumberId: null };
+                if (!this.state.profile.userId) {
+                    const makePart = () => Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, '0');
+                    this.state.profile.userId = `PNT-${makePart()}-${makePart()}`;
+                    this.saveState();
                 }
             }
 
@@ -1203,8 +1313,10 @@
                 document.getElementById('global-balance').textContent = this.state.balance.toLocaleString() + ' ₽';
                 document.getElementById('global-usd').textContent = this.state.usdBalance + ' $';
                 document.getElementById('coll-count-badge').textContent = `${this.state.collection.length} / ${maxCap}`;
-                document.getElementById('menu-collection-sub').textContent = `${this.state.collection.length} / ${maxCap} номеров`;
-                document.getElementById('menu-fav-sub').textContent = `${this.state.favorites.length} / ${maxFavCap} предметов`;
+                const menuCollectionSub = document.getElementById('menu-collection-sub');
+                if (menuCollectionSub) menuCollectionSub.textContent = `${this.state.collection.length} / ${maxCap} номеров`;
+                const menuFavSub = document.getElementById('menu-fav-sub');
+                if (menuFavSub) menuFavSub.textContent = `${this.state.favorites.length} / ${maxFavCap} предметов`;
                 
                 const profSub = document.getElementById('menu-profile-sub');
                 if (profSub) profSub.textContent = this.state.profile.nickname || 'Настройка и статус';
@@ -1243,7 +1355,7 @@
             switchTab(tabId) {
                 if (this.isRevealing) return;
                 this.activeTab = tabId;
-                ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades'].forEach(s => {
+                ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event'].forEach(s => {
                     const el = document.getElementById(`sec-${s}`);
                     if (el) el.classList.add('hidden');
                 });
@@ -1256,6 +1368,7 @@
                 if (tabId === 'favorites') this.renderFavorites();
                 if (tabId === 'quests') this.renderQuestsUI();
                 if (tabId === 'upgrades') this.renderUpgradesUI();
+                if (tabId === 'event') this.renderEventUI();
             }
 
             // -------------------------------------------------------------
@@ -1476,6 +1589,8 @@
                 const regDateInput = document.getElementById('prof-reg-date');
 
                 if (nicknameInput) nicknameInput.value = this.state.profile.nickname || '';
+                const userIdEl = document.getElementById('profile-user-id');
+                if (userIdEl) userIdEl.textContent = this.state.profile.userId || 'PNT-...';
                 if (bioInput) {
                     bioInput.value = this.state.profile.bio || '';
                     document.getElementById('bio-char-count').textContent = `${bioInput.value.length} / 150`;
@@ -1576,6 +1691,8 @@
             }
 
             handleGeneratorPointerDown(event) {
+                // Guard against stale/overlapping generator layers when another tab is open.
+                if (this.activeTab !== 'generator' || !event.currentTarget || event.currentTarget.classList.contains('hidden')) return;
                 if (event.pointerType === 'mouse' && event.button !== 0) return;
                 if (event.target.closest('button, a, input, select, textarea')) return;
 
@@ -1600,6 +1717,7 @@
             }
 
             handleGeneratorPointerUp(event) {
+                if (this.activeTab !== 'generator') return;
                 const pointerId = event.pointerId;
                 const timer = this.pressTimers.get(pointerId);
                 if (timer) {
@@ -1664,15 +1782,16 @@
                 document.getElementById('drop-action-buttons').classList.remove('opacity-20', 'pointer-events-none');
 
                 document.getElementById('drop-rarity-text').textContent = item.rarity.name;
-                document.getElementById('drop-rarity-text').style.color = item.rarity.color;
-                document.getElementById('drop-price-tag').textContent = item.price.toLocaleString() + ' ₽';
+                document.getElementById('drop-rarity-text').style.color = item.rarityKey === 'secret' ? '#ffffff' : item.rarity.color;
+                document.getElementById('drop-rarity-text').classList.toggle('secret-rarity', item.rarityKey === 'secret');
+                document.getElementById('drop-price-tag').textContent = item.price.toLocaleString() + (item.rarityKey === 'secret' ? ' $' : ' ₽');
                 document.getElementById('drop-number-display').textContent = item.formattedNumber;
                 document.getElementById('drop-number-display').classList.remove('typing-cursor');
                 document.getElementById('drop-pattern-desc').textContent = item.patternDesc;
                 document.getElementById('drop-country-flag').textContent = item.flag;
 
                 const pillBg = document.getElementById('phone-pill-bg');
-                pillBg.className = `w-full max-w-sm py-4.5 px-6 rounded-[28px] shadow-2xl flex items-center justify-center border border-white/20 ${item.rarity.pillBg}`;
+                pillBg.className = `w-full max-w-sm py-4.5 px-6 rounded-[28px] shadow-2xl flex items-center justify-center border border-white/20 ${item.rarityKey === 'secret' ? 'secret-rarity-bg' : item.rarity.pillBg}`;
 
                 const dotsContainer = document.getElementById('drop-rarity-dots');
                 dotsContainer.innerHTML = Array(item.rarity.dots).fill(0).map(() => 
@@ -1701,12 +1820,14 @@
                 card.classList.remove('hidden');
 
                 document.getElementById('drop-rarity-text').textContent = item.rarity.name;
-                document.getElementById('drop-rarity-text').style.color = item.rarity.color;
+                document.getElementById('drop-rarity-text').style.color = item.rarityKey === 'secret' ? '#ffffff' : item.rarity.color;
+                document.getElementById('drop-rarity-text').classList.toggle('secret-rarity', item.rarityKey === 'secret');
+                document.getElementById('drop-price-tag').textContent = item.price.toLocaleString() + (item.rarityKey === 'secret' ? ' $' : ' ₽');
                 document.getElementById('drop-country-flag').textContent = item.flag;
                 document.getElementById('drop-pattern-desc').textContent = 'Анализ комбинации...';
 
                 const pillBg = document.getElementById('phone-pill-bg');
-                pillBg.className = `w-full max-w-sm py-4.5 px-6 rounded-[28px] shadow-2xl transition-all duration-300 flex items-center justify-center border border-white/20 ${item.rarity.pillBg}`;
+                pillBg.className = `w-full max-w-sm py-4.5 px-6 rounded-[28px] shadow-2xl transition-all duration-300 flex items-center justify-center border border-white/20 ${item.rarityKey === 'secret' ? 'secret-rarity-bg' : item.rarity.pillBg}`;
 
                 const dotsContainer = document.getElementById('drop-rarity-dots');
                 dotsContainer.innerHTML = Array(item.rarity.dots).fill(0).map(() => 
@@ -1746,7 +1867,7 @@
                             if (this.isAutoClickerEnabled) {
                                 this.startAutoClickerLoop();
                             }
-                        });
+                        }, item.rarityKey === 'secret' ? '$' : '₽');
                     }
                 }, 110);
             }
@@ -1831,7 +1952,7 @@
                 }
             }
 
-            animatePriceCounter(targetPrice, onComplete) {
+            animatePriceCounter(targetPrice, onComplete, currency = '₽') {
                 const priceTag = document.getElementById('drop-price-tag');
                 let currentVal = 0;
                 const duration = 1200;
@@ -1846,12 +1967,12 @@
                     const easeProgress = 1 - (1 - progress) * (1 - progress);
                     currentVal = Math.floor(easeProgress * targetPrice);
 
-                    priceTag.textContent = currentVal.toLocaleString() + ' ₽';
+                    priceTag.textContent = currentVal.toLocaleString() + ' ' + currency;
 
                     if (progress < 1) {
                         this.priceCounterInterval = requestAnimationFrame(step);
                     } else {
-                        priceTag.textContent = targetPrice.toLocaleString() + ' ₽';
+                        priceTag.textContent = targetPrice.toLocaleString() + ' ' + currency;
                         if (onComplete) onComplete();
                     }
                 };
@@ -1878,12 +1999,14 @@
                     const item = this.state.collection[idx];
                     this.state.collection.splice(idx, 1);
                     this.state.favorites = this.state.favorites.filter(f => f.id !== id);
+                    if (item.rarityKey === 'secret' && item.plan && !this.state.eventSecretSold.includes(item.plan.code)) this.state.eventSecretSold.push(item.plan.code);
 
                     if (this.state.profile.selectedNumberId === id) {
                         this.state.profile.selectedNumberId = null;
                     }
 
-                    this.state.balance += item.price;
+                    if (item.rarityKey === 'secret' || item.currency === 'usd') this.state.usdBalance = (this.state.usdBalance || 0) + item.price;
+                    else this.state.balance += item.price;
 
                     this.state.quests.sellCount = Math.min(100, this.state.quests.sellCount + 1);
                     this.state.quests.salesEarnings = Math.min(5000000, this.state.quests.salesEarnings + item.price);
@@ -1894,16 +2017,23 @@
                     this.renderCollection();
                     this.renderMarket();
                     this.renderFavorites();
-                    this.showToast(`Продано за ${item.price.toLocaleString()} ₽`, 'success');
+                    this.renderEventUI();
+                    this.showToast(item.rarityKey === 'secret' ? `Секретный номер продан за ${item.price} $` : `Продано за ${item.price.toLocaleString()} ₽`, 'success');
                 }
             }
 
             executeBulkSell() {
                 let earned = 0;
+                let earnedUsd = 0;
                 let soldAmount = 0;
+                const soldIds = new Set();
                 this.state.collection = this.state.collection.filter(item => {
                     if (this.selectedMarketIds.has(item.id)) {
-                        earned += item.price;
+                        soldIds.add(item.id);
+                        if (item.rarityKey === 'secret' || item.currency === 'usd') {
+                            earnedUsd += item.price;
+                            if (item.plan && !this.state.eventSecretSold.includes(item.plan.code)) this.state.eventSecretSold.push(item.plan.code);
+                        } else earned += item.price;
                         soldAmount++;
                         if (this.state.profile.selectedNumberId === item.id) {
                             this.state.profile.selectedNumberId = null;
@@ -1914,6 +2044,8 @@
                 });
 
                 this.state.balance += earned;
+                this.state.usdBalance = (this.state.usdBalance || 0) + earnedUsd;
+                this.state.favorites = this.state.favorites.filter(item => !soldIds.has(item.id));
 
                 this.state.quests.sellCount = Math.min(100, this.state.quests.sellCount + soldAmount);
                 this.state.quests.salesEarnings = Math.min(5000000, this.state.quests.salesEarnings + earned);
@@ -1923,7 +2055,9 @@
                 this.updateUIHeader();
                 this.renderProfileSelectedNumber();
                 this.renderMarket();
-                this.showToast(`Продано на сумму ${earned.toLocaleString()} ₽`, 'success');
+                this.renderFavorites();
+                this.renderEventUI();
+                this.showToast(`Продано на сумму ${earned.toLocaleString()} ₽ и ${earnedUsd} $`, 'success');
             }
 
             renderQuestsUI() {
@@ -2135,6 +2269,7 @@
                     }
                     item.isFavorite = true;
                     this.state.favorites.push(item);
+                    this.selectedMarketIds.delete(id);
                     
                     if (!this.state.profile.selectedNumberId) {
                         this.state.profile.selectedNumberId = item.id;
@@ -2147,6 +2282,7 @@
                 this.updateUIHeader();
                 this.renderProfileSelectedNumber();
                 this.renderCollection();
+                this.renderMarket();
                 this.renderFavorites();
             }
 
@@ -2167,13 +2303,13 @@
                 grid.innerHTML = visibleItems.map(item => `
                     <div class="glass-card p-3 rounded-xl border border-slate-800 flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${item.rarity.pillBg}">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${item.rarityKey === 'secret' ? 'secret-rarity-bg' : item.rarity.pillBg}">
                                 ${item.flag}
                             </div>
                             <div>
                                 <h4 class="font-black text-white text-xs">${item.formattedNumber}</h4>
-                                <span class="text-[10px] uppercase font-bold" style="color:${item.rarity.color}">${item.rarity.name}</span>
-                                <p class="text-[10px] font-mono text-emerald-400 font-bold">${item.price.toLocaleString()} ₽</p>
+                                <span class="text-[10px] uppercase font-bold ${item.rarityKey === 'secret' ? 'secret-rarity' : ''}" style="${item.rarityKey === 'secret' ? '' : `color:${item.rarity.color}`} ">${item.rarity.name}</span>
+                                <p class="text-[10px] font-mono text-emerald-400 font-bold">${item.price.toLocaleString()} ${item.rarityKey === 'secret' || item.currency === 'usd' ? '$' : '₽'}</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-1.5">
@@ -2202,7 +2338,7 @@
                 const searchVal = (document.getElementById('market-search')?.value || '').toLowerCase();
                 const sortVal = document.getElementById('market-sort')?.value || 'price-desc';
 
-                let items = [...this.state.collection];
+                let items = this.state.collection.filter(i => !this.state.favorites.some(f => f.id === i.id));
 
                 if (searchVal) {
                     items = items.filter(i => i.formattedNumber.toLowerCase().includes(searchVal) || i.plan.country.toLowerCase().includes(searchVal));
@@ -2220,17 +2356,21 @@
                 grid.innerHTML = items.map(item => {
                     const isSelected = this.selectedMarketIds.has(item.id);
                     return `
-                        <div onclick="app.toggleMarketSelect('${item.id}')" class="glass-card p-3 rounded-xl border cursor-pointer transition ${isSelected ? 'border-purple-500 bg-purple-900/20' : 'border-slate-800 hover:border-slate-700'} flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="w-5 h-5 rounded border border-slate-700 flex items-center justify-center text-xs ${isSelected ? 'bg-purple-600 text-white border-purple-500' : 'bg-slate-900'}">
+                        <div onclick="app.toggleMarketSelect('${item.id}')" class="glass-card p-3 rounded-xl border cursor-pointer transition ${isSelected ? 'border-purple-500 bg-purple-900/20' : 'border-slate-800 hover:border-slate-700'} flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-5 h-5 rounded border border-slate-700 flex items-center justify-center text-xs shrink-0 ${isSelected ? 'bg-purple-600 text-white border-purple-500' : 'bg-slate-900'}">
                                     ${isSelected ? '<i class="fa-solid fa-check"></i>' : ''}
                                 </div>
-                                <div>
+                                <div class="min-w-0">
                                     <h4 class="font-bold text-white text-xs">${item.flag} ${item.formattedNumber}</h4>
-                                    <span class="text-[10px] uppercase font-bold" style="color:${item.rarity.color}">${item.rarity.name}</span>
+                                    <span class="text-[10px] uppercase font-bold ${item.rarityKey === 'secret' ? 'secret-rarity' : ''}" style="${item.rarityKey === 'secret' ? '' : `color:${item.rarity.color}`} ">${item.rarity.name}</span>
+                                    <p class="font-mono text-xs font-black text-emerald-400">${item.price.toLocaleString()} ${item.rarityKey === 'secret' || item.currency === 'usd' ? '$' : '₽'}</p>
                                 </div>
                             </div>
-                            <span class="font-mono text-xs font-black text-emerald-400">${item.price.toLocaleString()} ₽</span>
+                            <div class="flex items-center gap-1 shrink-0">
+                                <button onclick="event.stopPropagation(); app.toggleFavorite('${item.id}')" title="${item.isFavorite ? 'Убрать из избранного' : 'В избранное'}" class="w-8 h-8 rounded-lg glass-panel flex items-center justify-center text-xs ${item.isFavorite ? 'text-rose-400' : 'text-slate-400 hover:text-rose-400'}"><i class="fa-${item.isFavorite ? 'solid' : 'regular'} fa-heart"></i></button>
+                                <button onclick="event.stopPropagation(); app.executeSellItem('${item.id}')" class="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs">Продать</button>
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -2252,7 +2392,7 @@
             }
 
             selectAllMarket() {
-                this.state.collection.forEach(i => this.selectedMarketIds.add(i.id));
+                this.state.collection.filter(i => !this.state.favorites.some(f => f.id === i.id)).forEach(i => this.selectedMarketIds.add(i.id));
                 this.renderMarket();
             }
 
@@ -2273,19 +2413,36 @@
                 grid.innerHTML = this.state.favorites.map(item => `
                     <div class="glass-card p-3 rounded-xl border border-slate-800 flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${item.rarity.pillBg}">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${item.rarityKey === 'secret' ? 'secret-rarity-bg' : item.rarity.pillBg}">
                                 ${item.flag}
                             </div>
                             <div>
                                 <h4 class="font-black text-white text-xs">${item.formattedNumber}</h4>
-                                <span class="text-[10px] uppercase font-bold" style="color:${item.rarity.color}">${item.rarity.name}</span>
+                                <span class="text-[10px] uppercase font-bold ${item.rarityKey === 'secret' ? 'secret-rarity' : ''}" style="${item.rarityKey === 'secret' ? '' : `color:${item.rarity.color}`} ">${item.rarity.name}</span>
                             </div>
                         </div>
-                        <button onclick="app.toggleFavorite('${item.id}')" class="w-8 h-8 rounded-lg glass-panel flex items-center justify-center text-xs text-rose-400 hover:bg-rose-500/10">
+                        <button onclick="app.toggleFavorite('${item.id}')" title="Убрать из избранного" aria-label="Убрать из избранного" class="w-8 h-8 rounded-lg glass-panel flex items-center justify-center text-xs text-rose-400 hover:bg-rose-500/10">
                             <i class="fa-solid fa-heart"></i>
                         </button>
                     </div>
                 `).join('');
+            }
+
+            renderEventUI() {
+                const grid = document.getElementById('event-secret-slots');
+                if (!grid) return;
+                const secretCodes = ['SECRET_RU', 'SECRET_MR', 'SECRET_US', 'SECRET_UK'];
+                const sold = Array.isArray(this.state.eventSecretSold) ? this.state.eventSecretSold : [];
+                grid.innerHTML = secretCodes.map(code => {
+                    const found = sold.includes(code);
+                    const names = { SECRET_RU: '+7 777 777 7777', SECRET_MR: '+222 22222222', SECRET_US: '+1 111 111 1111', SECRET_UK: '+44 444 444444' };
+                    return `<div class="min-h-28 rounded-2xl border ${found ? 'border-fuchsia-400/60 bg-fuchsia-950/30' : 'border-slate-700 bg-gradient-to-br from-black to-slate-800'} p-4 flex flex-col items-center justify-center text-center shadow-lg">
+                        <div class="text-lg font-black ${found ? 'secret-rarity' : 'text-slate-500'}">${found ? '✓ ' + names[code] : '???? ????'}</div>
+                        <div class="text-[10px] mt-2 ${found ? 'text-fuchsia-200' : 'text-slate-600'}">${found ? 'СЕКРЕТНЫЙ НОМЕР СОБРАН' : 'ЗАКРЫТО'}</div>
+                    </div>`;
+                }).join('');
+                const progress = document.getElementById('event-secret-progress');
+                if (progress) progress.textContent = `${secretCodes.filter(code => sold.includes(code)).length} / 4`;
             }
 
             // MODALS & ADMIN
@@ -2377,6 +2534,87 @@
                 this.showToast('Выдан Легендарный номер', 'success');
             }
 
+            async copyProfileId() {
+                const id = String(this.state.profile.userId || '').trim();
+                if (!id) {
+                    this.showToast('ID пользователя ещё не создан.', 'error');
+                    return;
+                }
+
+                // Clipboard API works only in secure contexts on some browsers;
+                // use a temporary textarea as a fallback for local HTML files.
+                try {
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function' && window.isSecureContext) {
+                        await navigator.clipboard.writeText(id);
+                    } else {
+                        const textarea = document.createElement('textarea');
+                        textarea.value = id;
+                        textarea.setAttribute('readonly', '');
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        textarea.style.pointerEvents = 'none';
+                        document.body.appendChild(textarea);
+                        textarea.focus();
+                        textarea.select();
+                        textarea.setSelectionRange(0, textarea.value.length);
+                        const copied = document.execCommand('copy');
+                        textarea.remove();
+                        if (!copied) throw new Error('Copy command failed');
+                    }
+                    this.showToast('ID скопирован: ' + id, 'success');
+                } catch (error) {
+                    // Last-resort fallback: select the visible ID so it can be copied manually.
+                    const idElement = document.getElementById('profile-user-id');
+                    if (idElement) {
+                        const range = document.createRange();
+                        range.selectNodeContents(idElement);
+                        const selection = window.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }
+                    this.showToast('Не удалось скопировать автоматически. ID выделен: ' + id, 'info');
+                }
+            }
+
+            adminGrantCurrencyById() {
+                const targetId = (document.getElementById('admin-target-user-id')?.value || '').trim().toUpperCase();
+                const amount = Number(document.getElementById('admin-target-reward-amount')?.value || 0);
+                const type = document.getElementById('admin-target-reward-type')?.value || 'rub';
+                if (!targetId || targetId !== String(this.state.profile.userId || '').toUpperCase()) {
+                    this.showToast('Этот ID не совпадает с профилем, открытым в этом браузере.', 'error');
+                    return;
+                }
+                if (!Number.isFinite(amount) || amount <= 0) { this.showToast('Укажите сумму больше нуля.', 'error'); return; }
+                if (type === 'usd') this.state.usdBalance = (Number(this.state.usdBalance) || 0) + amount;
+                else this.state.balance = (Number(this.state.balance) || 0) + amount;
+                this.saveState(); this.updateUIHeader();
+                this.showToast(`Начислено ${amount.toLocaleString()} ${type === 'usd' ? '$' : '₽'} игроку ${targetId}`, 'success');
+            }
+
+            adminGrantNumberById() {
+                const targetId = (document.getElementById('admin-target-user-id')?.value || '').trim().toUpperCase();
+                if (!targetId || targetId !== String(this.state.profile.userId || '').toUpperCase()) {
+                    this.showToast('Этот ID не совпадает с профилем, открытым в этом браузере.', 'error');
+                    return;
+                }
+                const type = document.getElementById('admin-target-number-type')?.value || 'legendary';
+                let item = NumberGenerator.generate();
+                if (type === 'legendary') {
+                    item.rarityKey = 'legendary'; item.rarity = RARITIES.legendary; item.price = 3000000; item.patternDesc = 'Номер выдан разработчиком';
+                } else if (type === 'mythic') {
+                    item.rarityKey = 'mythic'; item.rarity = RARITIES.mythic; item.price = 35000000; item.formattedNumber = '+880 ' + Math.floor(1000 + Math.random() * 9000) + ' ' + Math.floor(1000 + Math.random() * 9000); item.flag = '🌐'; item.patternDesc = 'Мифическая серия (+880)';
+                } else if (type === 'ultra') {
+                    item.rarityKey = 'ultra'; item.rarity = RARITIES.ultra; item.price = 200000000; item.formattedNumber = '+888 ' + Math.floor(1000 + Math.random() * 9000) + ' ' + Math.floor(1000 + Math.random() * 9000); item.flag = '🌐'; item.patternDesc = 'Telegram Ultra Rare';
+                } else if (type === 'secret') {
+                    const secretPlans = PHONE_PLANS.filter(p => p.forceRarity === 'secret');
+                    const plan = secretPlans.length ? secretPlans[Math.floor(Math.random() * secretPlans.length)] : null;
+                    if (plan) { item.plan = plan; item.formattedNumber = plan.pattern.replace(/X/g, '7'); item.flag = plan.flag; }
+                    item.rarityKey = 'secret'; item.rarity = RARITIES.secret || { id:'secret', rank:8, name:'Секретная', color:'#e879f9', pillBg:'bg-fuchsia-500', dots:8, minPrice:1, maxPrice:1, isUnskippable:true }; item.price = 1; item.patternDesc = 'Секретный номер для ивента';
+                }
+                this.state.collection.unshift(item); this.saveState(); this.updateUIHeader(); this.renderMarket(); this.renderFavorites();
+                this.showToast(`Номер выдан игроку ${targetId}`, 'success');
+            }
+
             adminClearCollection() {
                 this.state.collection = [];
                 this.state.favorites = [];
@@ -2394,19 +2632,13 @@
             app = new App();
             app.init();
 
-            // Allow tapping anywhere on the screen, including blank areas outside the generator.
-            // Keep real controls and open overlays interactive, and avoid double-taps inside the generator.
+            // Во время открытого генератора нажатие в любой свободной области экрана
+            // тоже запускает прокрутку. Кнопки и поля управления не перехватываем.
             document.addEventListener('pointerdown', function(event) {
-                if (!app || (event.pointerType === 'mouse' && event.button !== 0)) return;
-                const generator = document.getElementById('sec-generator');
-                if (generator && generator.contains(event.target)) return;
-                if (event.target.closest('button, a, input, select, textarea, [role="dialog"]')) return;
-                const menu = document.getElementById('sec-menu');
-                if (menu && !menu.classList.contains('hidden') && menu.contains(event.target)) return;
-                const overlays = document.querySelectorAll('.modal, [aria-modal="true"]');
-                for (const overlay of overlays) {
-                    if (!overlay.classList.contains('hidden') && overlay.contains(event.target)) return;
-                }
+                if (!app || app.activeTab !== 'generator') return;
+                if (event.target.closest('#sec-generator')) return; // внутри генератора уже обрабатывается
+                if (event.target.closest('button, a, input, select, textarea, [role="dialog"], #sec-menu, #sec-market, #sec-profile, #sec-favorites, #sec-upgrades, #sec-quests, #sec-event')) return;
+                if (event.pointerType === 'mouse' && event.button !== 0) return;
                 app.handleTapToOpen();
             }, { passive: true });
         };
@@ -2424,6 +2656,119 @@
   document.addEventListener('keydown', function (event) {
     if ((event.ctrlKey || event.metaKey) && ['+', '-', '=', '0'].includes(event.key)) event.preventDefault();
   });
+})();
+</script>
+
+<script id="gifts-roulette-link">
+const ROULETTE_SRC = "<!DOCTYPE html>\n<html lang=\"ru\">\n<head>\n<script>\n(function(){\n  var KEY='tg_gifts_roulette_v2', BAL=__RL_BAL_PLACEHOLDER__;\n  var _get=Storage.prototype.getItem, _set=Storage.prototype.setItem;\n  function snap(d){\n    try{\n      var inv=(d.inventory||[]).map(function(o){\n        var g=GIFT_MAP[o.id];\n        return g?{uid:o.u,id:o.id,s:o.s,name:g.name,icon:g.icon,rarity:g.rarity,nft:g.nft,priceRub:g.priceRub}:null;\n      }).filter(Boolean);\n      parent.postMessage({type:'rl-save',balance:d.balance,items:inv},'*');\n    }catch(e){}\n  }\n  Storage.prototype.getItem=function(k){\n    var v=_get.call(this,k);\n    if(k!==KEY) return v;\n    var d; try{ d=v?JSON.parse(v):{}; }catch(e){ d={}; }\n    d=d||{}; d.balance=BAL;\n    snap(d);\n    return JSON.stringify(d);\n  };\n  Storage.prototype.setItem=function(k,v){\n    if(k===KEY){ try{ snap(JSON.parse(v)); }catch(e){} }\n    return _set.call(this,k,v);\n  };\n})();\n<\/script>\n<style>button[title^=\"Сбросить баланс\"]{display:none!important}<\/style>\n\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Telegram Gifts Roulette<\/title>\n<script src=\"https://cdn.tailwindcss.com/3.4.17\"><\/script>\n<script src=\"https://unpkg.com/react@18.3.1/umd/react.production.min.js\" crossorigin><\/script>\n<script src=\"https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js\" crossorigin><\/script>\n<script src=\"https://unpkg.com/htm@3.1.1/dist/htm.umd.js\"><\/script>\n<style>\n@keyframes pop{0%{transform:scale(.55);opacity:.3}60%{transform:scale(1.1);opacity:1}100%{transform:scale(1)}}\n.pop{animation:pop .32s ease-out}\n.mcard{contain:layout paint}\n<\/style>\n<\/head>\n<body class=\"bg-slate-950 text-slate-100\">\n<div id=\"root\"><\/div>\n<script>\nconst { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue, memo } = React;\nconst html = htm.bind(React.createElement);\n\n/* ---------- ИКОНКИ (inline SVG, без внешней библиотеки) ---------- */\nconst ICONS = {\n  gift:'<rect x=\"3\" y=\"8\" width=\"18\" height=\"4\" rx=\"1\"/><path d=\"M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5\"/>',\n  play:'<polygon points=\"6 3 20 12 6 21 6 3\"/>',\n  bag:'<path d=\"M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0\"/>',\n  box:'<path d=\"m7.5 4.3 9 5.1M21 8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7zM3.3 7l8.7 5 8.7-5M12 22V12\"/>',\n  hist:'<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5M12 7v5l4 2\"/>',\n  chart:'<path d=\"M12 20V10M18 20V4M6 20v-4\"/>',\n  sliders:'<path d=\"M4 6h16M4 12h16M4 18h16\"/><circle cx=\"9\" cy=\"6\" r=\"2\" fill=\"currentColor\"/><circle cx=\"15\" cy=\"12\" r=\"2\" fill=\"currentColor\"/><circle cx=\"8\" cy=\"18\" r=\"2\" fill=\"currentColor\"/>',\n  vol:'<polygon points=\"11 5 6 9 2 9 2 15 6 15 11 19 11 5\"/><path d=\"M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14\"/>',\n  mute:'<polygon points=\"11 5 6 9 2 9 2 15 6 15 11 19 11 5\"/><path d=\"m22 9-6 6M16 9l6 6\"/>',\n  search:'<circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/>',\n  x:'<path d=\"M18 6 6 18M6 6l12 12\"/>',\n  refresh:'<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5\"/>',\n  coins:'<circle cx=\"8\" cy=\"8\" r=\"6\"/><path d=\"M18.1 10.4A6 6 0 1 1 10.3 18M7 6h1v4\"/>',\n  spark:'<path d=\"m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z\"/>',\n};\nconst Icon = memo(({ n, className = 'w-4 h-4' }) => html`<svg className=${className} viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\" dangerouslySetInnerHTML=${{ __html: ICONS[n] }} />`);\n\n/* ---------- ДАННЫЕ: подарки Telegram ---------- */\n// Формат: \"Название|иконка|цена в TON\". Цены (TON) придуманы, 1 TON = 800 ₽.\nconst RUB_PER_TON = 800;\nconst RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];\nconst CATALOG = {\n  regular: {\n    common: 'Red Heart|❤️|0.3;Teddy Bear|🧸|0.5;Gift Box|🎁|0.6;Red Rose|🌹|0.4;Birthday Cake|🎂|0.5;Flower Bouquet|💐|0.7;Champagne|🍾|0.9;Golden Trophy|🏆|1;Stars x50|⭐|0.7;Premium 1 Month|🌟|1.2',\n    uncommon: 'Rocket|🚀|2.2;Gold Ring|💍|3;Diamond|💎|4;Stars x500|✨|4.5;Premium 3 Months|👑|3.5',\n  },\n  nft: {\n    common: 'Lol Pop|🍭|0.5;Candy Cane|🍬|0.6;Jingle Bells|🔔|0.7;Cookie Heart|🍪|0.6;Desk Calendar|📅|0.8;Star Notepad|📓|0.7;Party Sparkler|🎇|0.9;Easter Egg|🥚|0.8;Ice Cream|🍦|0.8;Holiday Drink|🍹|0.9;B-Day Candle|🕯️|0.7;Winter Wreath|🎄|0.9;Xmas Stocking|🧦|0.8;Sleigh Bell|🛎️|1;Whip Cupcake|🧁|1;Instant Ramen|🍜|0.9',\n    uncommon: 'Homemade Cake|🍰|1.6;Hypno Lollipop|🌀|2;Snow Globe|❄️|2.4;Santa Hat|🎅|2;Jelly Bunny|🐰|2.8;Pet Snake|🐍|2.5;Spiced Wine|🍷|2.2;Record Player|📻|3.2;Tama Gadget|🕹️|3;Crystal Ball|🔮|3.4;Jack-in-the-Box|🤡|3.6;Lush Bouquet|🌷|3;Mad Pumpkin|🎃|3.8;Bow Tie|🎀|2.6;Big Year|🎆|3.5;Moon Pendant|🌙|4.2;Cupid Charm|💘|4.5;Skull Flower|🥀|4.4;Money Pot|💰|4.8;Pretty Posy|🌸|3.2',\n    rare: 'Loot Bag|👜|7;Scared Cat|🙀|8;Toy Bear|🐻|9;Berry Box|🍓|7.5;Bunny Muffin|🐇|8.5;Magic Potion|🧪|12;Perfume Bottle|🧴|14;Genie Lamp|🪔|10;Sharp Tongue|👅|11;Kissed Frog|🐸|13;Top Hat|🎩|12;Trapped Heart|💔|15;Evil Eye|🧿|9.5;Voodoo Doll|🪆|11.5;Flying Broom|🧹|8.5;Witch Hat|🧙|9;Hex Pot|🍲|9;Spy Agaric|🍄|10;Jester Hat|🤹|14;Vintage Cigar|🚬|16;Snoop Dogg|🐶|18;Bling Binky|🍼|13;Low Rider|🚗|17;Sky Stilettos|👠|16;Light Sword|⚔️|19',\n    epic: 'Victory Medal|🏅|35;Electric Skull|☠️|32;Swiss Watch|⌚|40;Rare Bird|🦜|42;Love Candle|🕯️|38;Signet Ring|🪙|45;Ion Gem|💠|50;Bonded Ring|💞|55;Neko Helmet|🐱|60;Eternal Rose|🌺|70;Mini Oscar|🎬|90',\n    legendary: 'Nail Bracelet|📿|160;Gem Signet|🔷|200;Astral Shard|🌌|250;Heroic Helmet|🪖|320;Precious Peach|🍑|400',\n    mythic: \"Heart Locket|🔐|1200;Durov's Cap|🧢|1800;Plush Pepe|🐸|3000\",\n  },\n};\nconst GIFTS = [];\nObject.entries(CATALOG).forEach(([type, byR]) => Object.entries(byR).forEach(([rarity, s]) => s.split(';').forEach(row => {\n  const [name, icon, ton] = row.split('|');\n  GIFTS.push({ id: 'g' + GIFTS.length, name, icon, rarity, nft: type === 'nft', priceTon: +ton, priceRub: Math.round(+ton * RUB_PER_TON) });\n})));\nconst GIFT_MAP = Object.fromEntries(GIFTS.map(g => [g.id, g]));\n\n/* ---------- РЕЖИМЫ И ШАНСЫ (жёсткие: RTP ≈ 65–75%) ---------- */\nconst MODES = [\n  { id: 'standard', name: 'Классическая', cost: 1000, desc: 'Все подарки. Почти всё — Common', pool: g => true,\n    rates: { common: 93.6, uncommon: 5.75, rare: 0.6, epic: 0.04, legendary: 0.0095, mythic: 0.0005 } },\n  { id: 'collectibles', name: 'Коллекционная', cost: 5000, desc: 'Только NFT-подарки с номерами', pool: g => g.nft,\n    rates: { common: 51, uncommon: 36.2, rare: 11.6, epic: 1, legendary: 0.18, mythic: 0.02 } },\n  { id: 'highroller', name: 'High Roller', cost: 25000, desc: 'Rare и выше (NFT)', pool: g => RARITIES.indexOf(g.rarity) >= 2,\n    rates: { rare: 82, epic: 15.9, legendary: 2, mythic: 0.1 } },\n  { id: 'godmode', name: 'Mythic Hunt', cost: 100000, desc: 'Epic, Legendary, Mythic — лучший шанс на Mythic', pool: g => RARITIES.indexOf(g.rarity) >= 3,\n    rates: { epic: 86.5, legendary: 12.2, mythic: 1.3 } },\n];\nconst DEFAULT_RATES = Object.fromEntries(MODES.map(m => [m.id, { ...m.rates }]));\n\nconst RC = {\n  common: ['bg-slate-800/90', 'border-slate-600', 'text-slate-300', 'bg-slate-500'],\n  uncommon: ['bg-emerald-950/70', 'border-emerald-500', 'text-emerald-400', 'bg-emerald-500'],\n  rare: ['bg-blue-950/70', 'border-blue-500', 'text-blue-400', 'bg-blue-500'],\n  epic: ['bg-purple-950/70', 'border-purple-500', 'text-purple-400', 'bg-purple-500'],\n  legendary: ['bg-amber-950/70', 'border-amber-500', 'text-amber-400', 'bg-amber-500'],\n  mythic: ['bg-rose-950/70', 'border-rose-500', 'text-rose-400', 'bg-rose-500'],\n};\n\n/* ---------- ДВИЖОК ШАНСОВ ---------- */\nconst rnd = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; };\nconst fmt = n => Math.round(n).toLocaleString('ru-RU');\nconst pct = p => p >= 1 ? p.toFixed(2) : p >= 0.01 ? p.toFixed(3) : p.toFixed(4);\nconst label = i => i.nft && i.serial ? `${i.name} #${i.serial}` : i.name;\n\n// Внутри редкости дорогие подарки выпадают реже (вес = 1/цена).\nfunction buildTable(mode, rates) {\n  const pool = GIFTS.filter(mode.pool);\n  const by = {};\n  pool.forEach(g => (by[g.rarity] = by[g.rarity] || []).push(g));\n  let active = RARITIES.filter(r => by[r] && rates[r] > 0);\n  if (!active.length) { rates = DEFAULT_RATES[mode.id]; active = RARITIES.filter(r => by[r] && rates[r] > 0); }\n  const total = active.reduce((a, r) => a + rates[r], 0);\n  const entries = [], cum = [], chance = {}, share = {};\n  let acc = 0, ev = 0;\n  active.forEach(r => {\n    const sw = by[r].reduce((a, g) => a + 1 / g.priceTon, 0);\n    share[r] = rates[r] / total * 100;\n    by[r].forEach(g => {\n      const p = rates[r] / total * (1 / g.priceTon) / sw;\n      acc += p; entries.push(g); cum.push(acc); chance[g.id] = p * 100; ev += p * g.priceRub;\n    });\n  });\n  cum[cum.length - 1] = 1;\n  return { entries, cum, chance, share, rtp: ev / mode.cost * 100 };\n}\nfunction pick(t) {\n  const r = rnd(); let lo = 0, hi = t.cum.length - 1;\n  while (lo < hi) { const m = (lo + hi) >> 1; t.cum[m] > r ? (hi = m) : (lo = m + 1); }\n  return t.entries[lo];\n}\nconst drop = g => ({ ...g, uid: Math.random().toString(36).slice(2, 10), serial: g.nft ? 1 + Math.floor(rnd() * rnd() * 99999) : 0 });\n\n/* ---------- СОХРАНЕНИЕ ---------- */\nconst KEY = 'tg_gifts_roulette_v2';\nconst START = 33333;\nconst EMPTY_TOTALS = { spent: 0, won: 0, spins: 0, byRarity: {}, best: 0 };\nconst pack = i => ({ id: i.id, s: i.serial, u: i.uid });\nconst unpack = o => GIFT_MAP[o.id] ? { ...GIFT_MAP[o.id], serial: o.s, uid: o.u } : null;\nfunction load() {\n  try {\n    const d = JSON.parse(localStorage.getItem(KEY) || 'null'); if (!d) return {};\n    return {\n      ...d,\n      inventory: (d.inventory || []).map(unpack).filter(Boolean),\n      history: (d.history || []).map(h => ({ ...h, items: h.items.map(unpack).filter(Boolean) })),\n    };\n  } catch (e) { return {}; }\n}\n\n/* ---------- КОМПОНЕНТЫ ---------- */\nconst ReelCard = memo(({ item }) => html`\n  <div className=${`w-28 h-36 shrink-0 rounded-xl border-2 ${RC[item.rarity][1]} ${RC[item.rarity][0]} flex flex-col items-center justify-between p-2.5 shadow-md`}>\n    <span className=\"text-[9px] uppercase font-bold text-slate-400 self-start tracking-wider\">${item.rarity}<\/span>\n    <div className=\"text-3xl my-auto\">${item.icon}<\/div>\n    <div className=\"text-center w-full\">\n      <div className=\"text-xs font-bold text-slate-200 truncate\">${item.name}<\/div>\n      <div className=\"text-[10px] font-semibold text-amber-300\">${fmt(item.priceRub)} ₽<\/div>\n    <\/div>\n  <\/div>`);\n\nconst GiftCard = memo(({ gift, chance, onSell }) => html`\n  <div className=${`p-3 rounded-xl border ${RC[gift.rarity][1]} ${RC[gift.rarity][0]} flex flex-col justify-between gap-2`}>\n    <div className=${`text-[9px] font-bold uppercase flex justify-between ${RC[gift.rarity][2]}`}>\n      <span>${gift.rarity}<\/span><span>${gift.nft ? 'NFT' : ''}<\/span>\n    <\/div>\n    <div className=\"text-4xl text-center my-1\">${gift.icon}<\/div>\n    <div>\n      <div className=\"font-bold text-xs text-slate-100 truncate\" title=${gift.name}>${label(gift)}<\/div>\n      <div className=\"mt-1.5 flex items-center justify-between pt-1.5 border-t border-slate-800/80\">\n        <span className=\"text-xs font-bold text-amber-300\">${fmt(gift.priceRub)} ₽<\/span>\n        ${chance !== undefined && html`<span className=\"text-[10px] text-slate-400\">${chance ? pct(chance) + '%' : '—'}<\/span>`}\n      <\/div>\n      ${onSell && html`<button onClick=${() => onSell(gift.uid)} className=\"w-full mt-2 py-1 bg-slate-800 hover:bg-red-950 hover:text-red-300 text-slate-300 border border-slate-700 rounded-lg text-[11px] font-bold transition\">Продать<\/button>`}\n    <\/div>\n  <\/div>`);\n\nfunction RateInput({ value, onChange }) {\n  const [t, setT] = useState(String(value));\n  useEffect(() => { if (parseFloat(t) !== value) setT(String(value)); }, [value]);\n  return html`<input type=\"number\" step=\"any\" min=\"0\" value=${t}\n    onChange=${e => { setT(e.target.value); const n = parseFloat(e.target.value); onChange(n >= 0 ? n : 0); }}\n    className=\"bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-100 w-24 text-center\" />`;\n}\n\nconst Stat = ({ title, value, cls = 'text-slate-100' }) => html`\n  <div className=\"p-3 bg-slate-900 border border-slate-800 rounded-xl\">\n    <div className=\"text-[10px] text-slate-400 font-semibold\">${title}<\/div>\n    <div className=${`text-base font-bold mt-0.5 ${cls}`}>${value}<\/div>\n  <\/div>`;\n\nconst TABS = [['roulette', 'Рулетка', 'play'], ['catalog', 'Каталог Гифтов', 'bag'], ['inventory', 'Инвентарь', 'box'], ['history', 'История', 'hist'], ['stats', 'Статистика & RTP', 'chart'], ['adminpanel', 'Админ-панель', 'coins']];\nconst btnCls = 'px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs md:text-sm border border-slate-700 transition disabled:opacity-40';\n\n/* ---------- АДМИН-ПАНЕЛЬ (с паролем) ---------- */\nconst ADMIN_PASSWORD = 'sasart1526@1234ggsjd';\nconst MAX_GIVE = 1000;\n\nfunction AdminPanel({ unlocked, setUnlocked, balance, setBalance, setInventory, setNotice, rates, setRates, tables, adminMode, setAdminMode, resetAll }) {\n  const [pw, setPw] = useState('');\n  const [err, setErr] = useState('');\n  const [amount, setAmount] = useState('1000000');\n  const [gq, setGq] = useState('');\n  const [gRar, setGRar] = useState('all');\n  const [gid, setGid] = useState(null);\n  const [qty, setQty] = useState('1');\n  const [serial, setSerial] = useState('');\n  const [msg, setMsg] = useState('');\n  const flash = t => { setMsg(t); setTimeout(() => setMsg(''), 2500); };\n\n  const inp = 'bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500';\n\n  if (!unlocked) {\n    const submit = () => {\n      if (pw === ADMIN_PASSWORD) { setUnlocked(true); setErr(''); setPw(''); }\n      else { setErr('Неверный пароль'); setPw(''); }\n    };\n    return html`\n      <div className=\"flex flex-col items-center gap-3 py-12 max-w-xs mx-auto w-full\">\n        <div className=\"text-4xl\">🔒<\/div>\n        <h2 className=\"text-lg font-bold\">Админ-панель<\/h2>\n        <p className=\"text-xs text-slate-400 text-center\">Введите пароль, чтобы выдавать себе деньги и подарки<\/p>\n        <input type=\"password\" value=${pw} autoFocus placeholder=\"Пароль\"\n          onChange=${e => { setPw(e.target.value); setErr(''); }}\n          onKeyDown=${e => e.key === 'Enter' && submit()}\n          className=${'w-full ' + inp} />\n        ${err && html`<div className=\"text-xs font-semibold text-red-400\">${err}<\/div>`}\n        <button onClick=${submit} className=\"w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition\">Войти<\/button>\n      <\/div>`;\n  }\n\n  const addMoney = sign => {\n    const n = parseFloat(amount);\n    if (!(n >= 0)) return flash('Введите корректную сумму');\n    setBalance(b => b + sign * n);\n    flash((sign > 0 ? 'Добавлено ' : 'Списано ') + fmt(n) + ' ₽');\n  };\n  const setMoney = () => {\n    const n = parseFloat(amount);\n    if (!(n >= 0)) return flash('Введите корректную сумму');\n    setBalance(n); flash('Баланс установлен: ' + fmt(n) + ' ₽');\n  };\n\n  const list = GIFTS.filter(g => (gRar === 'all' || g.rarity === gRar) && (!gq.trim() || g.name.toLowerCase().includes(gq.trim().toLowerCase())))\n    .sort((a, b) => a.priceRub - b.priceRub);\n  const chosen = gid ? GIFT_MAP[gid] : null;\n\n  const giveGift = () => {\n    if (!chosen) return flash('Выберите подарок');\n    const n = Math.min(MAX_GIVE, Math.max(1, parseInt(qty) || 1));\n    const sn = parseInt(serial);\n    const items = Array.from({ length: n }, () => {\n      const it = drop(chosen);\n      if (chosen.nft && sn > 0) it.serial = sn;\n      return it;\n    });\n    setInventory(p => [...items, ...p]);\n    flash(`Выдано: ${chosen.name} × ${n}`);\n  };\n  const giveSet = (filter, name) => {\n    const items = GIFTS.filter(filter).map(drop);\n    setInventory(p => [...items, ...p]);\n    flash(`Выдано ${items.length} шт (${name})`);\n  };\n  const clearInv = () => { if (confirm('Удалить весь инвентарь?')) { setInventory([]); flash('Инвентарь очищен'); } };\n\n  const box = 'bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3';\n  return html`\n    <div className=\"flex flex-col gap-4\">\n      <div className=\"flex items-center justify-between\">\n        <h2 className=\"text-lg font-bold\">Админ-панель 🔓<\/h2>\n        <button onClick=${() => setUnlocked(false)} className=\"text-[11px] px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg font-bold\">Выйти<\/button>\n      <\/div>\n      ${msg && html`<div className=\"text-xs font-semibold text-emerald-400\">${msg}<\/div>`}\n\n      <div className=${box}>\n        <div className=\"text-xs font-bold text-slate-200\">💰 Деньги · сейчас ${fmt(balance)} ₽<\/div>\n        <input type=\"number\" min=\"0\" value=${amount} onChange=${e => setAmount(e.target.value)} className=${inp} placeholder=\"Сумма, ₽\" />\n        <div className=\"flex flex-wrap gap-2\">\n          ${[10000, 100000, 1000000, 10000000, 1000000000].map(v => html`\n            <button key=${v} onClick=${() => setAmount(String(v))} className=\"px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-[11px] font-bold\">${fmt(v)}<\/button>`)}\n        <\/div>\n        <div className=\"flex flex-wrap gap-2\">\n          <button onClick=${() => addMoney(1)} className=\"px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl\">Добавить<\/button>\n          <button onClick=${() => addMoney(-1)} className=\"px-3 py-2 bg-red-900 hover:bg-red-800 text-red-200 font-bold text-xs rounded-xl\">Списать<\/button>\n          <button onClick=${setMoney} className=\"px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl\">Установить баланс<\/button>\n        <\/div>\n      <\/div>\n\n      <div className=${box}>\n        <div className=\"text-xs font-bold text-slate-200\">🎁 Выдать подарок<\/div>\n        <div className=\"flex flex-wrap gap-2\">\n          <input type=\"text\" value=${gq} onChange=${e => setGq(e.target.value)} placeholder=\"Поиск по названию...\" className=${'flex-1 min-w-[140px] ' + inp} />\n          <select value=${gRar} onChange=${e => setGRar(e.target.value)} className=${inp}>\n            <option value=\"all\">Все редкости<\/option>${RARITIES.map(r => html`<option key=${r} value=${r}>${r}<\/option>`)}\n          <\/select>\n        <\/div>\n        <div className=\"grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 overflow-y-auto max-h-64 pr-1\">\n          ${list.slice(0, 120).map(g => html`\n            <button key=${g.id} onClick=${() => setGid(g.id)}\n              className=${`p-2 rounded-lg border text-left flex items-center gap-2 ${RC[g.rarity][1]} ${gid === g.id ? 'ring-2 ring-blue-400 bg-blue-950/50' : RC[g.rarity][0]}`}>\n              <span className=\"text-xl\">${g.icon}<\/span>\n              <span className=\"min-w-0\">\n                <span className=\"block text-[11px] font-bold truncate\">${g.name}<\/span>\n                <span className=\"block text-[10px] text-amber-300\">${fmt(g.priceRub)} ₽${g.nft ? ' · NFT' : ''}<\/span>\n              <\/span>\n            <\/button>`)}\n        <\/div>\n        ${list.length > 120 && html`<p className=\"text-[10px] text-slate-500\">Показаны первые 120 из ${list.length} — уточните поиск<\/p>`}\n        <div className=\"flex flex-wrap items-center gap-2\">\n          <span className=\"text-xs text-slate-300\">${chosen ? `Выбрано: ${chosen.icon} ${chosen.name}` : 'Подарок не выбран'}<\/span>\n        <\/div>\n        <div className=\"flex flex-wrap items-center gap-2\">\n          <input type=\"number\" min=\"1\" max=${MAX_GIVE} value=${qty} onChange=${e => setQty(e.target.value)} className=${'w-24 ' + inp} placeholder=\"Кол-во\" />\n          ${chosen && chosen.nft && html`<input type=\"number\" min=\"1\" value=${serial} onChange=${e => setSerial(e.target.value)} className=${'w-36 ' + inp} placeholder=\"№ (пусто = случайный)\" />`}\n          <button onClick=${giveGift} className=\"px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl\">Выдать<\/button>\n        <\/div>\n      <\/div>\n\n      <div className=${box}>\n        <div className=\"text-xs font-bold text-slate-200\">📦 Массовая выдача (по 1 шт каждого)<\/div>\n        <div className=\"flex flex-wrap gap-2\">\n          ${RARITIES.map(r => html`\n            <button key=${r} onClick=${() => giveSet(g => g.rarity === r, r)} className=${`px-3 py-1.5 rounded-lg border text-[11px] font-bold capitalize ${RC[r][1]} ${RC[r][0]} ${RC[r][2]}`}>${r}<\/button>`)}\n          <button onClick=${() => giveSet(g => g.nft, 'все NFT')} className=\"px-3 py-1.5 bg-purple-900 hover:bg-purple-800 rounded-lg text-[11px] font-bold\">Все NFT<\/button>\n          <button onClick=${() => giveSet(() => true, 'весь каталог')} className=\"px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-[11px] font-bold\">Весь каталог<\/button>\n          <button onClick=${clearInv} className=\"px-3 py-1.5 bg-red-950 hover:bg-red-900 text-red-300 rounded-lg text-[11px] font-bold\">Очистить инвентарь<\/button>\n        <\/div>\n      <\/div>\n\n      <div className=${box}>\n        <div className=\"text-xs font-bold text-slate-200\">🎯 Настройка шансов<\/div>\n        <div className=\"flex flex-wrap gap-2\">\n          ${MODES.map(m => html`<button key=${m.id} onClick=${() => setAdminMode(m.id)} className=${`px-3 py-1.5 rounded-lg text-xs font-bold border ${adminMode === m.id ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-300'}`}>${m.name}<\/button>`)}\n        <\/div>\n        ${(() => {\n          const m = MODES.find(x => x.id === adminMode), t = tables[adminMode];\n          const avail = RARITIES.filter(r => GIFTS.some(g => g.rarity === r && m.pool(g)));\n          return html`<div className=\"flex flex-col gap-3\">\n            ${avail.map(r => html`\n              <div key=${r} className=\"flex items-center justify-between gap-3\">\n                <span className=${`capitalize font-bold text-xs w-24 ${RC[r][2]}`}>${r}<\/span>\n                <${RateInput} value=${rates[adminMode][r] ?? 0} onChange=${v => setRates(p => ({ ...p, [adminMode]: { ...p[adminMode], [r]: v } }))} />\n                <span className=\"text-[10px] text-slate-500 w-28 text-right\">реально ${t.share[r] !== undefined ? pct(t.share[r]) : '0'}%<\/span>\n              <\/div>`)}\n            <div className=\"flex items-center justify-between pt-2 border-t border-slate-800\">\n              <span className=\"text-xs text-slate-300\">Расчётный RTP: <b className=${t.rtp > 100 ? 'text-red-400' : 'text-emerald-400'}>${t.rtp.toFixed(1)}%<\/b><\/span>\n              <button onClick=${() => setRates(p => ({ ...p, [adminMode]: { ...DEFAULT_RATES[adminMode] } }))} className=\"text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg font-bold\">Сбросить к стандартным<\/button>\n            <\/div>\n            <p className=\"text-[10px] text-slate-500\">Значения нормализуются до 100%. Внутри редкости дорогие подарки выпадают реже.<\/p>\n          <\/div>`;\n        })()}\n      <\/div>\n\n      <div className=${box}>\n        <div className=\"text-xs font-bold text-slate-200\">⚠️ Сброс<\/div>\n        <button onClick=${resetAll} className=\"self-start text-[11px] px-3 py-1.5 bg-red-950 hover:bg-red-900 text-red-300 rounded-lg font-bold\">Сбросить прогресс<\/button>\n      <\/div>\n    <\/div>`;\n}\n\n/* ---------- АНИМАЦИЯ x5 / x10 (лёгкая: N карточек, один таймер) ---------- */\nfunction MultiReveal({ gifts, pool, onDone, beep }) {\n  const n = gifts.length;\n  const [shown, setShown] = useState(() => gifts.map(() => pool[(Math.random() * pool.length) | 0]));\n  const [locked, setLocked] = useState(0);\n  const lockedRef = useRef(0), doneRef = useRef(onDone), beepRef = useRef(beep), finished = useRef(false);\n  doneRef.current = onDone; beepRef.current = beep;\n\n  const finishNow = () => { if (finished.current) return; finished.current = true; doneRef.current(); };\n\n  useEffect(() => {\n    const step = n > 5 ? 240 : 320, t0 = Date.now() + 450;\n    const id = setInterval(() => {\n      const k = Math.min(n, Math.max(0, Math.floor((Date.now() - t0) / step) + 1));\n      if (k > lockedRef.current) { lockedRef.current = k; setLocked(k); beepRef.current('tick'); }\n      setShown(prev => prev.map((g, i) => i < lockedRef.current ? gifts[i] : pool[(Math.random() * pool.length) | 0]));\n      if (lockedRef.current >= n && Date.now() - t0 > n * step + 500) { clearInterval(id); finishNow(); }\n    }, 85);\n    return () => clearInterval(id);\n  }, []);\n\n  return html`\n    <div onClick=${() => { lockedRef.current = n; setLocked(n); setShown(gifts); setTimeout(finishNow, 150); }}\n      title=\"Нажмите, чтобы пропустить\"\n      className=\"w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 shadow-inner cursor-pointer select-none\">\n      <div className=${`grid gap-2 ${n > 5 ? 'grid-cols-5' : 'grid-cols-5'}`}>\n        ${shown.map((g, i) => {\n          const on = i < locked;\n          return html`\n            <div key=${i + (on ? 'l' : 's')}\n              className=${`mcard h-28 rounded-xl border-2 flex flex-col items-center justify-between p-1.5 ${on ? `pop ${RC[g.rarity][1]} ${RC[g.rarity][0]}` : 'border-slate-700 bg-slate-900 opacity-60'}`}>\n              <span className=${`text-[8px] uppercase font-bold self-start ${on ? RC[g.rarity][2] : 'text-slate-600'}`}>${on ? g.rarity : '···'}<\/span>\n              <div className=\"text-2xl my-auto\">${g.icon}<\/div>\n              <div className=\"text-[9px] font-bold truncate w-full text-center text-slate-300\">${on ? g.name : ' '}<\/div>\n            <\/div>`;\n        })}\n      <\/div>\n    <\/div>`;\n}\n\n/* ---------- ПРИЛОЖЕНИЕ ---------- */\nfunction App() {\n  const saved = useMemo(load, []);\n  const [balance, setBalance] = useState(saved.balance ?? START);\n  const [inventory, setInventory] = useState(saved.inventory || []);\n  const [history, setHistory] = useState(saved.history || []);\n  const [totals, setTotals] = useState(saved.totals || EMPTY_TOTALS);\n  const [rates, setRates] = useState({ ...DEFAULT_RATES, ...(saved.rates || {}) });\n  const [sound, setSound] = useState(saved.sound ?? true);\n  const [fast, setFast] = useState(saved.fast ?? false);\n  const [modeId, setModeId] = useState(saved.modeId || 'standard');\n  const [tab, setTab] = useState('roulette');\n  const [adminMode, setAdminMode] = useState('standard');\n  const [unlocked, setUnlocked] = useState(false);\n  const [spinning, setSpinning] = useState(false);\n  const [reel, setReel] = useState([]);\n  const [multi, setMulti] = useState(null); // { gifts, cost, m, pool }\n  const [result, setResult] = useState(null); // { items, cost }\n  const [notice, setNotice] = useState('');\n  const [q, setQ] = useState('');\n  const [rf, setRf] = useState('all');\n  const [tf, setTf] = useState('all');\n  const dq = useDeferredValue(q);\n\n  const reelRef = useRef(null), boxRef = useRef(null), audio = useRef(null), timers = useRef([]), busy = useRef(false);\n  const mode = MODES.find(m => m.id === modeId);\n  const tables = useMemo(() => Object.fromEntries(MODES.map(m => [m.id, buildTable(m, rates[m.id])])), [rates]);\n  const table = tables[modeId];\n\n  useEffect(() => () => timers.current.forEach(clearTimeout), []);\n  const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };\n\n  useEffect(() => { // сохранение (с задержкой)\n    const t = setTimeout(() => {\n      try {\n        localStorage.setItem(KEY, JSON.stringify({ balance, sound, fast, modeId, rates, totals,\n          inventory: inventory.map(pack), history: history.map(h => ({ ...h, items: h.items.map(pack) })) }));\n      } catch (e) {}\n    }, 500);\n    return () => clearTimeout(t);\n  }, [balance, inventory, history, totals, rates, sound, fast, modeId]);\n\n  useEffect(() => { // стартовая лента при смене режима/шансов\n    if (busy.current) return;\n    if (reelRef.current) { reelRef.current.style.transition = 'none'; reelRef.current.style.transform = 'translateX(0)'; }\n    setReel(Array.from({ length: 50 }, () => pick(table)));\n  }, [table]);\n\n  useEffect(() => {\n    if (!notice) return;\n    const t = setTimeout(() => setNotice(''), 2500);\n    return () => clearTimeout(t);\n  }, [notice]);\n\n  const beep = useCallback((type) => {\n    if (!sound) return;\n    try {\n      const C = window.AudioContext || window.webkitAudioContext;\n      const ctx = audio.current || (audio.current = new C());\n      if (ctx.state === 'suspended') ctx.resume();\n      const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;\n      o.connect(g); g.connect(ctx.destination);\n      if (type === 'tick') {\n        o.frequency.setValueAtTime(400, t); g.gain.setValueAtTime(0.03, t); g.gain.exponentialRampToValueAtTime(1e-5, t + 0.04); o.start(t); o.stop(t + 0.04);\n      } else {\n        o.type = 'triangle';\n        [523.25, 659.25, 783.99].forEach((f, i) => o.frequency.setValueAtTime(f, t + i * 0.1));\n        g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.4); o.start(t); o.stop(t + 0.4);\n      }\n    } catch (e) {}\n  }, [sound]);\n\n  const finish = useCallback((gifts, cost, m) => {\n    const items = gifts.map(drop);\n    const value = items.reduce((a, i) => a + i.priceRub, 0);\n    const time = new Date().toLocaleTimeString('ru-RU');\n    busy.current = false; setSpinning(false);\n    setResult({ items, cost, value });\n    setInventory(p => [...items, ...p]);\n    setHistory(p => [{ id: Math.random().toString(36).slice(2, 10), items, cost, winValue: value, time, mode: m.name }, ...p].slice(0, 150));\n    setTotals(t => {\n      const byRarity = { ...t.byRarity };\n      items.forEach(i => (byRarity[i.rarity] = (byRarity[i.rarity] || 0) + 1));\n      return { spent: t.spent + cost, won: t.won + value, spins: t.spins + items.length, byRarity, best: Math.max(t.best, ...items.map(i => i.priceRub)) };\n    });\n  }, []);\n\n  const spin = (count) => {\n    const cost = mode.cost * count;\n    if (busy.current) return;\n    if (balance < cost) { setNotice('Недостаточно виртуального баланса!'); return; }\n    busy.current = true; setSpinning(true); setResult(null); setBalance(b => b - cost);\n    const m = mode, t = table;\n    if (fast) {\n      const gifts = Array.from({ length: count }, () => pick(t));\n      later(() => { beep('win'); finish(gifts, cost, m); }, 150);\n      return;\n    }\n    if (count > 1) {\n      const gifts = Array.from({ length: count }, () => pick(t));\n      setMulti({ gifts, cost, m, pool: t.entries });\n      return;\n    }\n    const TARGET = 35, won = pick(t);\n    const strip = Array.from({ length: 50 }, (_, i) => i === TARGET ? won : pick(t));\n    reelRef.current.style.transition = 'none'; reelRef.current.style.transform = 'translateX(0)';\n    setReel(strip);\n    requestAnimationFrame(() => requestAnimationFrame(() => {\n      const el = reelRef.current && reelRef.current.children[TARGET];\n      if (!el) return;\n      const off = el.offsetLeft - boxRef.current.offsetWidth / 2 + el.offsetWidth / 2;\n      reelRef.current.style.transition = 'transform 4.2s cubic-bezier(0.1, 0.85, 0.15, 1)';\n      reelRef.current.style.transform = `translateX(-${off}px)`;\n      for (let i = 1; i <= 26; i++) later(() => beep('tick'), 4200 * (1 - Math.pow(1 - i / 26, 2)));\n      later(() => { beep('win'); finish([won], cost, m); }, 4300);\n    }));\n  };\n\n  const sell = useCallback((uid) => {\n    setInventory(inv => {\n      const it = inv.find(i => i.uid === uid);\n      if (it) setBalance(b => b + it.priceRub);\n      return inv.filter(i => i.uid !== uid);\n    });\n  }, []);\n  const sellAll = () => { setBalance(b => b + inventory.reduce((a, i) => a + i.priceRub, 0)); setInventory([]); };\n  const resetAll = () => {\n    if (!confirm('Сбросить баланс, инвентарь, историю и статистику? (Шансы останутся)')) return;\n    setBalance(START); setInventory([]); setHistory([]); setTotals(EMPTY_TOTALS);\n  };\n\n  const catalog = useMemo(() => {\n    const s = dq.trim().toLowerCase();\n    return GIFTS.filter(g => (rf === 'all' || g.rarity === rf) && (tf === 'all' || (tf === 'nft') === g.nft) && (!s || g.name.toLowerCase().includes(s)))\n      .sort((a, b) => a.priceRub - b.priceRub);\n  }, [dq, rf, tf]);\n  const invSorted = useMemo(() => [...inventory].sort((a, b) => b.priceRub - a.priceRub), [inventory]);\n  const invValue = useMemo(() => inventory.reduce((a, i) => a + i.priceRub, 0), [inventory]);\n  const rtp = totals.spent > 0 ? totals.won / totals.spent * 100 : 0;\n  const sel = 'bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500';\n\n  return html`\n  <div className=\"min-h-screen flex flex-col font-sans selection:bg-blue-600\">\n    <header className=\"border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 px-4 py-3 flex items-center justify-between\">\n      <div className=\"flex items-center gap-3\">\n        <div className=\"w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20\"><${Icon} n=\"gift\" className=\"w-6 h-6 text-white\" /><\/div>\n        <div>\n          <h1 className=\"font-bold text-base md:text-lg leading-none bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent\">Telegram Gifts Roulette<\/h1>\n          <p className=\"text-[11px] text-slate-400 mt-0.5\">Виртуальная симуляция гифтов<\/p>\n        <\/div>\n      <\/div>\n      <div className=\"flex items-center gap-3\">\n        <div className=\"bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 flex items-center gap-2\">\n          <${Icon} n=\"coins\" className=\"w-4 h-4 text-amber-400\" />\n          <div>\n            <div className=\"text-[9px] text-slate-400 uppercase tracking-wider font-semibold\">Баланс<\/div>\n            <div className=\"text-xs md:text-sm font-bold text-amber-300\">${fmt(balance)} ₽<\/div>\n          <\/div>\n          <button onClick=${() => setBalance(START)} title=\"Сбросить баланс до 33 333 ₽\" className=\"ml-1 bg-slate-800 hover:bg-slate-700 text-slate-300 p-1 rounded-lg transition\"><${Icon} n=\"refresh\" className=\"w-3 h-3\" /><\/button>\n        <\/div>\n        <button onClick=${() => setSound(!sound)} className=${`p-2 rounded-xl border transition ${sound ? 'bg-blue-600/20 border-blue-500/40 text-blue-400' : 'bg-slate-800 border-slate-700 text-slate-400'}`}><${Icon} n=${sound ? 'vol' : 'mute'} /><\/button>\n      <\/div>\n    <\/header>\n\n    <div className=\"flex-1 max-w-7xl w-full mx-auto flex flex-col md:flex-row gap-6 p-4 md:p-6\">\n      <nav className=\"w-full md:w-56 flex flex-row md:flex-col gap-1.5 overflow-x-auto pb-2 md:pb-0 shrink-0\">\n        ${TABS.map(([id, name, ic]) => html`\n          <button key=${id} onClick=${() => setTab(id)} className=${`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-xs md:text-sm transition text-left whitespace-nowrap ${tab === id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 font-semibold' : 'bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800/60'}`}>\n            <${Icon} n=${ic} className=${`w-4 h-4 ${tab === id ? 'text-white' : 'text-slate-400'}`} />${id === 'inventory' ? `Инвентарь (${inventory.length})` : name}\n          <\/button>`)}\n      <\/nav>\n\n      <main className=\"flex-1 min-w-0 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 md:p-6 flex flex-col relative overflow-hidden\">\n\n        <div className=${tab === 'roulette' ? 'flex flex-col gap-5 my-auto' : 'hidden'}>\n          <div className=\"grid grid-cols-1 md:grid-cols-4 gap-3\">\n            ${MODES.map(m => html`\n              <button key=${m.id} onClick=${() => !spinning && setModeId(m.id)} className=${`p-3.5 rounded-xl border text-left transition flex flex-col justify-between ${modeId === m.id ? 'bg-blue-950/40 border-blue-500 shadow-md shadow-blue-500/10' : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'}`}>\n                <div>\n                  <div className=\"font-bold text-sm text-slate-100 flex items-center justify-between\">${m.name}${modeId === m.id && html`<${Icon} n=\"spark\" className=\"w-3.5 h-3.5 text-blue-400\" />`}<\/div>\n                  <div className=\"text-[11px] text-slate-400 mt-1 leading-tight\">${m.desc}<\/div>\n                <\/div>\n                <div className=\"mt-3 flex justify-between text-xs font-semibold\">\n                  <span className=\"text-amber-300\">${fmt(m.cost)} ₽<\/span><span className=\"text-slate-500\">RTP ${tables[m.id].rtp.toFixed(0)}%<\/span>\n                <\/div>\n              <\/button>`)}\n          <\/div>\n\n          ${multi && html`<${MultiReveal} key=${multi.gifts.map(g => g.id).join()+multi.cost} gifts=${multi.gifts} pool=${multi.pool} beep=${beep}\n            onDone=${() => { const x = multi; setMulti(null); beep('win'); finish(x.gifts, x.cost, x.m); }} />`}\n          <div ref=${boxRef} className=${`relative w-full overflow-hidden bg-slate-950 border border-slate-800 rounded-2xl py-6 shadow-inner ${multi ? 'hidden' : ''}`}>\n            <div className=\"absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-1 bg-gradient-to-b from-amber-400 via-amber-300 to-amber-500 z-20 shadow-[0_0_12px_rgba(251,191,36,0.8)] pointer-events-none\">\n              <div className=\"absolute -top-1 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-amber-400 rotate-45 rounded-sm\"><\/div>\n              <div className=\"absolute -bottom-1 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-amber-400 rotate-45 rounded-sm\"><\/div>\n            <\/div>\n            <div ref=${reelRef} className=\"flex gap-3 px-4\" style=${{ width: 'max-content', willChange: 'transform' }}>\n              ${reel.map((it, i) => html`<${ReelCard} key=${i} item=${it} />`)}\n            <\/div>\n          <\/div>\n\n          <div className=\"bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex flex-col gap-3\">\n            <div className=\"text-[11px] text-slate-400 font-semibold\">Шансы режима «${mode.name}» · RTP ${table.rtp.toFixed(1)}%<\/div>\n            <div className=\"grid grid-cols-3 sm:grid-cols-6 gap-2\">\n              ${RARITIES.filter(r => table.share[r] !== undefined).map(r => html`\n                <div key=${r} className=\"bg-slate-950/60 rounded-lg p-2\">\n                  <div className=${`text-[9px] uppercase font-bold ${RC[r][2]}`}>${r}<\/div>\n                  <div className=\"text-xs font-bold text-slate-100\">${pct(table.share[r])}%<\/div>\n                  <div className=\"h-1 rounded bg-slate-800 mt-1\"><div className=${`h-1 rounded ${RC[r][3]}`} style=${{ width: Math.max(2, Math.min(100, table.share[r])) + '%' }}><\/div><\/div>\n                <\/div>`)}\n            <\/div>\n          <\/div>\n\n          <div className=\"flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-4 rounded-xl\">\n            <label className=\"flex items-center gap-2 text-xs text-slate-300 cursor-pointer\">\n              <input type=\"checkbox\" checked=${fast} onChange=${e => setFast(e.target.checked)} className=\"rounded bg-slate-800 border-slate-700\" /><span>Быстрый прокрут<\/span>\n            <\/label>\n            <div className=\"flex items-center gap-2 w-full sm:w-auto\">\n              <button disabled=${spinning} onClick=${() => spin(1)} className=\"flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-xs md:text-sm shadow-lg shadow-blue-600/30 transition disabled:opacity-50\">КРУТИТЬ x1 (${fmt(mode.cost)} ₽)<\/button>\n              <button disabled=${spinning} onClick=${() => spin(5)} className=${btnCls}>x5<\/button>\n              <button disabled=${spinning} onClick=${() => spin(10)} className=${btnCls}>x10<\/button>\n            <\/div>\n          <\/div>\n          ${notice && html`<div className=\"text-center text-xs font-semibold text-red-400\">${notice}<\/div>`}\n        <\/div>\n\n        ${tab === 'catalog' && html`\n          <div className=\"flex flex-col gap-4\">\n            <div className=\"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3\">\n              <div>\n                <h2 className=\"text-lg font-bold\">Каталог Telegram Gifts<\/h2>\n                <p className=\"text-xs text-slate-400\">${GIFTS.length} подарков · шанс указан для режима «${mode.name}»<\/p>\n              <\/div>\n              <div className=\"flex flex-wrap items-center gap-2 w-full sm:w-auto\">\n                <div className=\"relative flex-1 sm:w-40\">\n                  <${Icon} n=\"search\" className=\"w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400\" />\n                  <input type=\"text\" placeholder=\"Поиск...\" value=${q} onChange=${e => setQ(e.target.value)} className=${`w-full pl-8 pr-2 py-1.5 ${sel}`} />\n                <\/div>\n                <select value=${tf} onChange=${e => setTf(e.target.value)} className=${`px-2.5 py-1.5 ${sel}`}>\n                  <option value=\"all\">Все типы<\/option><option value=\"nft\">NFT<\/option><option value=\"reg\">Обычные<\/option>\n                <\/select>\n                <select value=${rf} onChange=${e => setRf(e.target.value)} className=${`px-2.5 py-1.5 ${sel}`}>\n                  <option value=\"all\">Все редкости<\/option>${RARITIES.map(r => html`<option key=${r} value=${r}>${r}<\/option>`)}\n                <\/select>\n              <\/div>\n            <\/div>\n            <div className=\"grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 overflow-y-auto max-h-[600px] pr-1\">\n              ${catalog.map(g => html`<${GiftCard} key=${g.id} gift=${g} chance=${table.chance[g.id] || 0} />`)}\n            <\/div>\n          <\/div>`}\n\n        ${tab === 'inventory' && html`\n          <div className=\"flex flex-col gap-4\">\n            <div className=\"flex justify-between items-center\">\n              <div>\n                <h2 className=\"text-lg font-bold\">Инвентарь<\/h2>\n                <p className=\"text-xs text-slate-400\">Предметов: ${inventory.length} на сумму ${fmt(invValue)} ₽<\/p>\n              <\/div>\n              ${inventory.length > 0 && html`<button onClick=${sellAll} className=\"px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl transition\">ПРОДАТЬ ВСЁ<\/button>`}\n            <\/div>\n            ${inventory.length === 0\n              ? html`<div className=\"text-center py-16 text-slate-500 flex flex-col items-center gap-2\"><${Icon} n=\"box\" className=\"w-10 h-10\" /><p className=\"text-xs\">Инвентарь пуст. Вращайте рулетку!<\/p><\/div>`\n              : html`<div className=\"grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 overflow-y-auto max-h-[600px] pr-1\">\n                  ${invSorted.slice(0, 300).map(i => html`<${GiftCard} key=${i.uid} gift=${i} onSell=${sell} />`)}\n                <\/div>\n                ${invSorted.length > 300 && html`<p className=\"text-[11px] text-slate-500 text-center\">Показаны 300 самых дорогих из ${invSorted.length}<\/p>`}`}\n          <\/div>`}\n\n        ${tab === 'history' && html`\n          <div className=\"flex flex-col gap-4\">\n            <h2 className=\"text-lg font-bold\">История прокруток<\/h2>\n            ${history.length === 0 ? html`<p className=\"text-slate-500 text-xs\">История пуста.<\/p>` : html`\n              <div className=\"flex flex-col gap-2 overflow-y-auto max-h-[600px] pr-1\">\n                ${history.map(h => html`\n                  <div key=${h.id} className=\"p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between\">\n                    <div className=\"flex items-center gap-3\">\n                      <div className=\"text-xl\">${h.items[0] && h.items[0].icon}<\/div>\n                      <div>\n                        <div className=\"font-bold text-xs text-slate-200\">${h.items.length === 1 ? label(h.items[0]) : `Мульти-выигрыш (${h.items.length} шт)`}<\/div>\n                        <div className=\"text-[10px] text-slate-500\">${h.mode} • ${h.time}<\/div>\n                      <\/div>\n                    <\/div>\n                    <div className=\"text-right\">\n                      <div className=\"text-[10px] text-slate-400\">Расход: ${fmt(h.cost)} ₽<\/div>\n                      <div className=${`text-xs font-bold ${h.winValue >= h.cost ? 'text-emerald-400' : 'text-slate-300'}`}>+${fmt(h.winValue)} ₽<\/div>\n                    <\/div>\n                  <\/div>`)}\n              <\/div>`}\n          <\/div>`}\n\n        ${tab === 'stats' && html`\n          <div className=\"flex flex-col gap-4\">\n            <h2 className=\"text-lg font-bold\">Статистика и RTP<\/h2>\n            <div className=\"grid grid-cols-2 md:grid-cols-4 gap-3\">\n              <${Stat} title=\"Всего потрачено\" value=${fmt(totals.spent) + ' ₽'} />\n              <${Stat} title=\"Общий выигрыш\" value=${fmt(totals.won) + ' ₽'} cls=\"text-emerald-400\" />\n              <${Stat} title=\"Фактический RTP\" value=${rtp.toFixed(1) + '%'} cls=\"text-blue-400\" />\n              <${Stat} title=\"Лучший дроп\" value=${fmt(totals.best) + ' ₽'} cls=\"text-amber-300\" />\n            <\/div>\n            <div className=\"grid grid-cols-3 md:grid-cols-6 gap-2\">\n              ${RARITIES.map(r => html`<div key=${r} className=${`p-2 rounded-lg border ${RC[r][1]} ${RC[r][0]}`}><div className=${`text-[9px] uppercase font-bold ${RC[r][2]}`}>${r}<\/div><div className=\"text-sm font-bold\">${totals.byRarity[r] || 0}<\/div><\/div>`)}\n            <\/div>\n            <p className=\"text-[11px] text-slate-500\">Прокрутов: ${totals.spins}. Теоретический RTP режимов: ${MODES.map(m => `${m.name} ${tables[m.id].rtp.toFixed(0)}%`).join(' · ')}<\/p>\n          <\/div>`}\n\n        ${tab === 'adminpanel' && html`<${AdminPanel} unlocked=${unlocked} setUnlocked=${setUnlocked} balance=${balance} setBalance=${setBalance} setInventory=${setInventory} setNotice=${setNotice} rates=${rates} setRates=${setRates} tables=${tables} adminMode=${adminMode} setAdminMode=${setAdminMode} resetAll=${resetAll} />`}\n      <\/main>\n    <\/div>\n\n    ${result && html`\n      <div className=\"fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4\">\n        <div className=\"bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 flex flex-col items-center text-center relative shadow-2xl\">\n          <button onClick=${() => setResult(null)} className=\"absolute top-3 right-3 text-slate-400 hover:text-white\"><${Icon} n=\"x\" /><\/button>\n          <${Icon} n=\"spark\" className=\"w-10 h-10 text-amber-400 mb-1 animate-bounce\" />\n          <h3 className=\"text-lg font-bold text-white\">${result.value >= result.cost ? 'Выигрыш!' : 'Ваш дроп'}<\/h3>\n          ${result.items.length === 1 ? html`\n            <div className=\"my-3 flex flex-col items-center\">\n              <div className=\"text-5xl my-2\">${result.items[0].icon}<\/div>\n              <div className=\"font-bold text-sm\">${label(result.items[0])}<\/div>\n              <div className=${`text-[10px] uppercase font-bold ${RC[result.items[0].rarity][2]}`}>${result.items[0].rarity}<\/div>\n              <div className=\"text-xs font-semibold text-amber-300 mt-0.5\">${fmt(result.items[0].priceRub)} ₽<\/div>\n            <\/div>` : html`\n            <div className=\"my-3 flex flex-wrap justify-center gap-1.5 max-h-52 overflow-y-auto\">\n              ${result.items.map(i => html`<div key=${i.uid} className=${`p-1.5 rounded-lg text-center border ${RC[i.rarity][1]} ${RC[i.rarity][0]}`}><div className=\"text-xl\">${i.icon}<\/div><div className=\"text-[9px] text-amber-300\">${fmt(i.priceRub)} ₽<\/div><\/div>`)}\n            <\/div>`}\n          <div className=${`text-xs mb-3 ${result.value >= result.cost ? 'text-emerald-400' : 'text-slate-400'}`}>Стоимость дропа ${fmt(result.value)} ₽ · потрачено ${fmt(result.cost)} ₽<\/div>\n          <button onClick=${() => setResult(null)} className=\"w-full py-2.5 bg-blue-600 hover:bg-blue-500 font-bold rounded-xl text-white text-xs transition shadow-lg shadow-blue-600/30\">ЗАБРАТЬ В ИНВЕНТАРЬ<\/button>\n        <\/div>\n      <\/div>`}\n  <\/div>`;\n}\nReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));\n<\/script>\n<\/body>\n<\/html>\n";
+(function () {
+  const MAX = 6;
+  const COL = { common:'#64748b', uncommon:'#10b981', rare:'#3b82f6', epic:'#a855f7', legendary:'#f59e0b', mythic:'#f43f5e' };
+  let frame, rlBal = null, inv = [];
+  const fmt = n => Math.round(n).toLocaleString('ru-RU');
+  const pinned = () => (app.state.profile.pinnedGifts = app.state.profile.pinnedGifts || []);
+  const title = g => g.nft && g.s ? `${g.name} #${g.s}` : g.name;
+
+  function mount() {
+    rlBal = Math.floor(app.state.balance);
+    frame.srcdoc = ROULETTE_SRC.replace('__RL_BAL_PLACEHOLDER__', String(rlBal));
+  }
+
+  function tile(g, extra, onclick) {
+    const c = COL[g.rarity] || '#64748b';
+    return `<div ${onclick ? `onclick="${onclick}"` : ''} style="border-color:${c};background:${c}1a" class="relative p-2 rounded-xl border text-center ${onclick ? 'cursor-pointer' : ''}">
+      <div class="text-[9px] font-bold uppercase" style="color:${c}">${g.rarity}${g.nft ? ' · NFT' : ''}</div>
+      <div class="text-3xl my-1">${g.icon}</div>
+      <div class="text-[11px] font-bold text-slate-100 truncate">${title(g)}</div>
+      <div class="text-[10px] font-bold text-amber-300">${fmt(g.priceRub)} ₽</div>${extra || ''}</div>`;
+  }
+
+  function renderProfile() {
+    const grid = document.getElementById('profile-gifts-grid'); if (!grid) return;
+    const list = pinned();
+    document.getElementById('profile-gifts-count').textContent = `${list.length} / ${MAX}`;
+    grid.innerHTML = list.length
+      ? list.map(g => tile(g, `<button onclick="event.stopPropagation();giftLink.toggle('${g.uid}')" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-slate-900/80 text-slate-300 text-[10px] leading-none">✕</button>`)).join('')
+      : '<p class="col-span-3 text-xs text-slate-500 text-center py-3">Пока пусто — выиграйте подарки в рулетке и выберите, какие показать.</p>';
+  }
+
+  function renderPicker() {
+    const grid = document.getElementById('gift-picker-grid'); if (!grid) return;
+    const sel = new Set(pinned().map(g => g.uid));
+    document.getElementById('gift-picker-count').textContent = `${sel.size} / ${MAX}`;
+    const sorted = [...inv].sort((a, b) => b.priceRub - a.priceRub);
+    grid.innerHTML = sorted.length
+      ? sorted.map(g => tile(g, sel.has(g.uid) ? '<div class="absolute top-1 right-1 text-emerald-400 text-xs"><i class="fa-solid fa-circle-check"></i></div>' : '', `giftLink.toggle('${g.uid}')`)).join('')
+      : '<div class="col-span-3 text-center text-xs text-slate-400 py-4 space-y-3"><p>Инвентарь рулетки пуст.</p><button onclick="giftLink.closePicker();app.switchTab(\'roulette\')" class="px-3 py-2 rounded-xl bg-fuchsia-600 text-white font-bold">Открыть рулетку</button></div>';
+  }
+
+  let lastMain = 'generator';
+  function updateNav() {
+    const g = app.activeTab === 'roulette';
+    const set = (id, on, col) => { const b = document.getElementById(id); if (b) b.className = `relative py-2.5 flex flex-col items-center gap-0.5 text-xs font-extrabold transition border-t-2 ${on ? col + ' bg-white/5' : 'text-slate-500 border-transparent'}`; };
+    set('nav-numbers', !g, 'text-cyan-400 border-cyan-400');
+    set('nav-gifts', g, 'text-fuchsia-300 border-fuchsia-400');
+  }
+  function updateMenuSub() {
+    const el = document.getElementById('nav-gifts-badge'); if (!el) return;
+    el.textContent = inv.length > 99 ? '99+' : inv.length;
+    el.classList.toggle('hidden', !inv.length);
+  }
+
+  window.giftLink = {
+    goNumbers() { app.switchTab(lastMain); },
+    openPicker() { renderPicker(); document.getElementById('gift-picker-modal').classList.remove('hidden'); },
+    closePicker() { document.getElementById('gift-picker-modal').classList.add('hidden'); renderProfile(); },
+    toggle(uid) {
+      const list = pinned(), i = list.findIndex(g => g.uid === uid);
+      if (i >= 0) list.splice(i, 1);
+      else {
+        const g = inv.find(x => x.uid === uid); if (!g) return;
+        if (list.length >= MAX) { app.showToast(`В профиле можно показать не больше ${MAX} подарков`, 'error'); return; }
+        list.push({ ...g });
+      }
+      app.saveState(); renderPicker(); renderProfile();
+    }
+  };
+
+  window.addEventListener('message', e => {
+    const m = e.data;
+    if (!frame || e.source !== frame.contentWindow || !m || m.type !== 'rl-save') return;
+    const b = Math.max(0, Math.floor(Number(m.balance) || 0));
+    if (rlBal !== null && b !== rlBal) {            // общий баланс: переносим изменение рулетки в основную игру
+      app.state.balance = Math.max(0, app.state.balance + (b - rlBal));
+      app.saveState(); app.updateUIHeader();
+    }
+    rlBal = b;
+    inv = Array.isArray(m.items) ? m.items : [];
+    const live = new Set(inv.map(g => g.uid));       // проданные подарки уходят из профиля
+    const list = pinned(), kept = list.filter(g => live.has(g.uid));
+    if (kept.length !== list.length) { app.state.profile.pinnedGifts = kept; app.saveState(); }
+    updateMenuSub(); renderProfile();
+    if (!document.getElementById('gift-picker-modal').classList.contains('hidden')) renderPicker();
+  });
+
+  function setup() {
+    if (typeof app === 'undefined' || !app) return setTimeout(setup, 50);
+    frame = document.getElementById('roulette-frame');
+
+    const origSwitch = app.switchTab.bind(app);
+    app.switchTab = function (tabId) {
+      if (this.isRevealing) return;
+      const sec = document.getElementById('sec-roulette'); if (sec) sec.classList.add('hidden');
+      origSwitch(tabId);
+      if (tabId !== 'roulette') lastMain = tabId === 'menu' ? lastMain : tabId;
+      updateNav();
+      if (tabId === 'roulette' && Math.floor(app.state.balance) !== rlBal) mount(); // подтянуть актуальный баланс
+    };
+    const origProfile = app.renderProfileUI.bind(app);
+    app.renderProfileUI = function () { origProfile(); renderProfile(); };
+
+    document.getElementById('mode-nav').addEventListener('pointerdown', e => e.stopPropagation());
+    updateNav(); renderProfile();
+    mount();
+  }
+  window.addEventListener('load', setup);
 })();
 </script>
 </body>
