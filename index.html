@@ -456,7 +456,7 @@
                 <div id="grand-bonus-actions" class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
                     <button id="btn-claim-bonus-rub" onclick="app.claimGrandBonus('rub')" disabled class="py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition disabled:opacity-40 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20">
                         <i class="fa-solid fa-coins"></i>
-                        <span>+10 000 000 ₽</span>
+                        <span>+1 000 000 ₽</span>
                     </button>
                     <button id="btn-claim-bonus-usd" onclick="app.claimGrandBonus('usd')" disabled class="py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition disabled:opacity-40 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20">
                         <i class="fa-solid fa-dollar-sign"></i>
@@ -894,15 +894,15 @@
                     }
                 }
 
-                // Редкие уровни дополнительно проходят отдельный шанс.
-                // Ориентировочно: эпик примерно 1/200, легендарный 1/1800, мифик 1/10000.
-                // Принудительные редкости из специальных пулов сохраняются.
+                // Лёгкое снижение шанса эпика: 3% подходящих комбинаций
+                // понижаются до редкого. Порог эпика остаётся 55 очков.
+                // Шансы легендарного, мифика и экзотика не меняются.
                 if (!plan.forceRarity) {
-                    if (rarityKey === 'mythic' && Math.random() >= 1 / 10000) {
+                    if (rarityKey === 'epic' && Math.random() < 0.05) {
+                        rarityKey = 'rare';
+                    } else if (rarityKey === 'mythic' && Math.random() >= 1 / 10000) {
                         rarityKey = 'rare';
                     } else if (rarityKey === 'legendary' && Math.random() >= 1 / 1800) {
-                        rarityKey = 'rare';
-                    } else if (rarityKey === 'epic' && Math.random() >= 1 / 200) {
                         rarityKey = 'rare';
                     }
                 }
@@ -1166,8 +1166,39 @@
             }
 
             resetGameData() {
-                localStorage.removeItem('pnt_save_v2');
-                location.reload();
+                // Сбрасываем только игровой прогресс, не удаляя другие данные
+                // localStorage (включая облачные сохранения и настройки сайта).
+                if (this.autoClickerInterval) this.stopAutoClicker();
+                if (this.typingTimeout) clearTimeout(this.typingTimeout);
+                if (this.priceCounterInterval) clearInterval(this.priceCounterInterval);
+                this.isRevealing = false;
+                this.currentDrop = null;
+                this.state.balance = 450000;
+                this.state.usdBalance = 50;
+                this.state.collection = [];
+                this.state.favorites = [];
+                this.state.upgrades = { autoSpeed: 0, maxCapacity: 50, maxFavCapacity: 3 };
+                this.state.profile.selectedNumberId = null;
+                this.state.quests = {
+                    lastResetDate: new Date().toDateString(),
+                    sellCount: 0,
+                    legendaryDropCount: 0,
+                    salesEarnings: 0,
+                    grandBonusClaimed: false
+                };
+                this.saveState();
+                this.updateUIHeader();
+                this.renderProfileSelectedNumber();
+                this.renderCollection();
+                this.renderMarket();
+                this.renderFavorites();
+                this.renderQuestsUI();
+                this.renderUpgradesUI();
+                const resultCard = document.getElementById('drop-result-card');
+                const tapPrompt = document.getElementById('prompt-tap-here');
+                if (resultCard) resultCard.classList.add('hidden');
+                if (tapPrompt) tapPrompt.classList.remove('hidden');
+                this.showToast('Прогресс сброшен: коллекция и избранное очищены, улучшения сброшены, баланс восстановлен.', 'success');
             }
 
             updateUIHeader() {
@@ -1944,8 +1975,8 @@
                 this.state.quests.grandBonusClaimed = true;
 
                 if (type === 'rub') {
-                    this.state.balance += 10000000;
-                    this.showToast('Бонус получен: +10 000 000 ₽!', 'success');
+                    this.state.balance += 1000000;
+                    this.showToast('Бонус получен: +1 000 000 ₽!', 'success');
                 } else if (type === 'usd') {
                     this.state.usdBalance += 100;
                     this.showToast('Бонус получен: +100 $!', 'success');
