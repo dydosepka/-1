@@ -895,14 +895,14 @@
                 }
 
                 // Редкие уровни дополнительно проходят отдельный шанс.
-                // Ориентировочно: эпик примерно 1/225, легендарный 1/2000, мифик 1/10000.
+                // Ориентировочно: эпик примерно 1/200, легендарный 1/1800, мифик 1/10000.
                 // Принудительные редкости из специальных пулов сохраняются.
                 if (!plan.forceRarity) {
                     if (rarityKey === 'mythic' && Math.random() >= 1 / 10000) {
                         rarityKey = 'rare';
-                    } else if (rarityKey === 'legendary' && Math.random() >= 1 / 2000) {
+                    } else if (rarityKey === 'legendary' && Math.random() >= 1 / 1800) {
                         rarityKey = 'rare';
-                    } else if (rarityKey === 'epic' && Math.random() >= 1 / 225) {
+                    } else if (rarityKey === 'epic' && Math.random() >= 1 / 200) {
                         rarityKey = 'rare';
                     }
                 }
@@ -1577,7 +1577,7 @@
                 this.saveState();
                 this.updateUIHeader();
 
-                if (item.rarity.isUnskippable) {
+                if (['epic', 'legendary', 'mythic', 'ultra'].includes(item.rarityKey)) {
                     this.startUnskippableReveal(item);
                 } else {
                     this.renderInstantDrop(item);
@@ -1726,7 +1726,14 @@
                         this.state.collection.unshift(lastItem);
                     }
                     this.currentDrop = lastItem;
-                    this.renderInstantDrop(lastItem);
+                    // В авто-режиме редкий дроп проходит ту же анимацию, что и ручной.
+                    // startUnskippableReveal приостановит цикл и возобновит его после завершения,
+                    // поэтому следующая прокрутка не сбрасывает текущую анимацию.
+                    if (['epic', 'legendary', 'mythic', 'ultra'].includes(lastItem.rarityKey)) {
+                        this.startUnskippableReveal(lastItem);
+                    } else {
+                        this.renderInstantDrop(lastItem);
+                    }
                     this.updateUIHeader();
                     const now = Date.now();
                     if (now - lastSave >= 500) { this.saveState(); lastSave = now; }
