@@ -497,7 +497,7 @@
                         <p id="upg-capacity-level" class="text-xs text-slate-400">Лимит: 50 слотов</p>
                     </div>
                     <button id="btn-upg-capacity" onclick="app.buyUpgrade('capacity')" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
-                        Улучшить (+50 мест) (<span id="upg-capacity-cost">300 000 ₽</span>)
+                        Улучшить (+150 мест) (<span id="upg-capacity-cost">300 000 ₽</span>)
                     </button>
                 </div>
 
@@ -895,14 +895,14 @@
                 }
 
                 // Редкие уровни дополнительно проходят отдельный шанс.
-                // Ориентировочно: эпик 1/250, легендарный 1/2000, мифик 1/10000.
+                // Ориентировочно: эпик примерно 1/225, легендарный 1/2000, мифик 1/10000.
                 // Принудительные редкости из специальных пулов сохраняются.
                 if (!plan.forceRarity) {
                     if (rarityKey === 'mythic' && Math.random() >= 1 / 10000) {
                         rarityKey = 'rare';
                     } else if (rarityKey === 'legendary' && Math.random() >= 1 / 2000) {
                         rarityKey = 'rare';
-                    } else if (rarityKey === 'epic' && Math.random() >= 1 / 250) {
+                    } else if (rarityKey === 'epic' && Math.random() >= 1 / 225) {
                         rarityKey = 'rare';
                     }
                 }
@@ -1034,6 +1034,7 @@
                 };
                 this.currentDrop = null;
                 this.selectedMarketIds = new Set();
+                this.collectionRenderLimit = 100;
                 this.autoClickerInterval = null;
                 this.cloudSyncTimer = null;
                 this.isAutoClickerEnabled = false;
@@ -1069,6 +1070,9 @@
                         if (parsed.upgrades.autoSpeed === undefined) parsed.upgrades.autoSpeed = 0;
                         if (!parsed.upgrades.maxCapacity) parsed.upgrades.maxCapacity = 50;
                         if (!parsed.upgrades.maxFavCapacity) parsed.upgrades.maxFavCapacity = 3;
+                        parsed.upgrades.autoSpeed = Math.min(15, Math.max(0, parsed.upgrades.autoSpeed || 0));
+                        parsed.upgrades.maxCapacity = Math.min(2000, Math.max(50, parsed.upgrades.maxCapacity || 50));
+                        parsed.upgrades.maxFavCapacity = Math.min(50, Math.max(3, parsed.upgrades.maxFavCapacity || 3));
                         if (!parsed.profile) {
                             parsed.profile = {
                                 nickname: 'Тайкун Игрок',
@@ -1204,7 +1208,7 @@
                     if (this.state.upgrades.autoSpeed === 0) {
                         autoBtnText.textContent = 'Авто 🔒 (в Улучшениях)';
                     } else {
-                        autoBtnText.textContent = `Авто ${this.state.upgrades.autoSpeed + 1}/с`;
+                        autoBtnText.textContent = `Авто ${Math.min(15, this.state.upgrades.autoSpeed)}/с`;
                     }
                 }
             }
@@ -1695,10 +1699,38 @@
             startAutoClickerLoop() {
                 if (this.autoClickerInterval) clearInterval(this.autoClickerInterval);
                 const btn = document.getElementById('btn-auto-click');
-                const autoClicksPerSec = this.state.upgrades.autoSpeed + 1;
-                const intervalMs = Math.round(1000 / autoClicksPerSec);
-
-                this.autoClickerInterval = setInterval(() => this.handleTapToOpen(), intervalMs);
+                const autoClicksPerSec = Math.min(15, Math.max(1, this.state.upgrades.autoSpeed));
+                // Run in small batches with fractional pacing to respect the selected clicks/second.
+                let clickAccumulator = 0;
+                let lastSave = 0;
+                this.autoClickerInterval = setInterval(() => {
+                    if (!this.isAutoClickerEnabled || this.isRevealing) return;
+                    const maxCap = Math.min(2000, this.state.upgrades.maxCapacity || 50);
+                    const available = maxCap - this.state.collection.length;
+                    const affordable = Math.floor(this.state.balance / 1500);
+                    clickAccumulator += autoClicksPerSec / 20;
+                    const scheduledBatch = Math.floor(clickAccumulator);
+                    if (scheduledBatch < 1) return;
+                    clickAccumulator -= scheduledBatch;
+                    const batch = Math.min(available, affordable, scheduledBatch);
+                    if (batch <= 0) {
+                        this.stopAutoClicker();
+                        this.showToast(available <= 0 ? `Коллекция заполнена (${maxCap} слотов)!` : 'Недостаточно средств для прокрутки', 'error');
+                        return;
+                    }
+                    let lastItem = null;
+                    for (let i = 0; i < batch; i++) {
+                        this.state.balance -= 1500;
+                        lastItem = NumberGenerator.generate();
+                        if (['legendary', 'mythic', 'ultra'].includes(lastItem.rarityKey)) this.state.quests.legendaryDropCount = Math.min(2, this.state.quests.legendaryDropCount + 1);
+                        this.state.collection.unshift(lastItem);
+                    }
+                    this.currentDrop = lastItem;
+                    this.renderInstantDrop(lastItem);
+                    this.updateUIHeader();
+                    const now = Date.now();
+                    if (now - lastSave >= 500) { this.saveState(); lastSave = now; }
+                }, 50);
                 btn.classList.add('bg-amber-500/20', 'border-amber-500');
                 document.getElementById('auto-click-text').textContent = 'Стоп Авто';
             }
@@ -1710,13 +1742,13 @@
                     this.autoClickerInterval = null;
                 }
                 const btn = document.getElementById('btn-auto-click');
-                const autoClicksPerSec = this.state.upgrades.autoSpeed + 1;
+                const autoClicksPerSec = this.state.upgrades.autoSpeed;
                 btn.classList.remove('bg-amber-500/20', 'border-amber-500');
                 
                 if (this.state.upgrades.autoSpeed === 0) {
                     document.getElementById('auto-click-text').textContent = 'Авто 🔒 (в Улучшениях)';
                 } else {
-                    document.getElementById('auto-click-text').textContent = `Авто ${autoClicksPerSec}/с`;
+                    document.getElementById('auto-click-text').textContent = `Авто ${Math.min(15, autoClicksPerSec)}/с`;
                 }
             }
 
@@ -1923,13 +1955,18 @@
                 const autoBtn = document.getElementById('btn-upg-auto');
 
                 const autoLevel = this.state.upgrades.autoSpeed || 0;
-                if (autoLevel === 0) {
+                if (autoLevel >= 15) {
+                    if (autoLevelEl) autoLevelEl.textContent = `Максимум: 15 кликов/сек`;
+                    if (autoCostEl) autoCostEl.textContent = 'MAX';
+                    if (autoBtn) { autoBtn.textContent = 'Максимум'; autoBtn.disabled = true; }
+                } else if (autoLevel === 0) {
+                    if (autoBtn) autoBtn.disabled = false;
                     if (autoLevelEl) autoLevelEl.textContent = 'Не куплено (Заблокировано)';
                     if (autoCostEl) autoCostEl.textContent = '50 $';
                     if (autoBtn) autoBtn.textContent = 'Купить (50 $)';
                 } else {
-                    if (autoLevelEl) autoLevelEl.textContent = `Уровень ${autoLevel} (${autoLevel + 1} клик/сек)`;
-                    const cost = 125 + (autoLevel - 1) * 50;
+                    if (autoLevelEl) autoLevelEl.textContent = `Уровень ${autoLevel}: ${Math.min(15, autoLevel)} кликов/сек`;
+                    const cost = Math.floor(125 * Math.pow(1.18, autoLevel - 1));
                     if (autoCostEl) autoCostEl.textContent = `${cost} $`;
                     if (autoBtn) autoBtn.textContent = `Улучшить (${cost} $)`;
                 }
@@ -1937,20 +1974,27 @@
                 const capLevelEl = document.getElementById('upg-capacity-level');
                 const capCostEl = document.getElementById('upg-capacity-cost');
                 const curCap = this.state.upgrades.maxCapacity || 50;
-                if (capLevelEl) capLevelEl.textContent = `Лимит: ${curCap} слотов`;
-                if (capCostEl) capCostEl.textContent = '300 000 ₽';
+                if (capLevelEl) capLevelEl.textContent = `Лимит: ${curCap} / 2 000 слотов`;
+                const capCost = Math.floor(300000 * Math.pow(1.65, Math.max(0, (curCap - 50) / 150)));
+                if (capCostEl) capCostEl.textContent = curCap >= 2000 ? 'MAX' : `${capCost.toLocaleString()} ₽`;
+                const capBtn = document.getElementById('btn-upg-capacity');
+                if (capBtn) { capBtn.disabled = curCap >= 2000; capBtn.innerHTML = curCap >= 2000 ? 'Максимум' : `Улучшить (+150 мест) (<span id="upg-capacity-cost">${capCost.toLocaleString()} ₽</span>)`; }
 
                 const favCapLevelEl = document.getElementById('upg-fav-capacity-level');
                 const favCapCostEl = document.getElementById('upg-fav-capacity-cost');
                 const curFavCap = this.state.upgrades.maxFavCapacity || 3;
-                if (favCapLevelEl) favCapLevelEl.textContent = `Лимит: ${curFavCap} слотов`;
-                if (favCapCostEl) favCapCostEl.textContent = '250 000 ₽';
+                if (favCapLevelEl) favCapLevelEl.textContent = `Лимит: ${curFavCap} / 50 слотов`;
+                const favCost = Math.floor(250000 * Math.pow(1.7, Math.max(0, curFavCap - 3)));
+                if (favCapCostEl) favCapCostEl.textContent = curFavCap >= 50 ? 'MAX' : `${favCost.toLocaleString()} ₽`;
+                const favBtn = document.getElementById('btn-upg-fav-capacity');
+                if (favBtn) { favBtn.disabled = curFavCap >= 50; favBtn.innerHTML = curFavCap >= 50 ? 'Максимум' : `Улучшить (${favCost.toLocaleString()} ₽)`; }
             }
 
             buyUpgrade(type) {
                 if (type === 'autoSpeed') {
                     const currentLevel = this.state.upgrades.autoSpeed || 0;
-                    const cost = currentLevel === 0 ? 50 : (125 + (currentLevel - 1) * 50);
+                    if (currentLevel >= 15) { this.showToast('Достигнут максимум: 15 кликов/сек', 'info'); return; }
+                    const cost = currentLevel === 0 ? 50 : Math.floor(125 * Math.pow(1.18, currentLevel - 1));
 
                     if (this.state.usdBalance < cost) {
                         this.showToast(`Недостаточно $! Требуется ${cost} $`, 'error');
@@ -1958,27 +2002,31 @@
                     }
 
                     this.state.usdBalance -= cost;
-                    this.state.upgrades.autoSpeed = currentLevel + 1;
-                    this.showToast(`Авто-прокрутка улучшена до ${this.state.upgrades.autoSpeed + 1} прокруток/сек!`, 'success');
+                    this.state.upgrades.autoSpeed = Math.min(15, currentLevel + 1);
+                    this.showToast(`Авто-прокрутка: ${this.state.upgrades.autoSpeed} кликов/сек!`, 'success');
                 } else if (type === 'capacity') {
-                    const cost = 300000;
+                    const currentCap = this.state.upgrades.maxCapacity || 50;
+                    if (currentCap >= 2000) { this.showToast('Вместимость уже максимальная: 2 000 слотов', 'info'); return; }
+                    const cost = Math.floor(300000 * Math.pow(1.65, Math.max(0, (currentCap - 50) / 150)));
                     if (this.state.balance < cost) {
                         this.showToast(`Недостаточно ₽! Требуется ${cost.toLocaleString()} ₽`, 'error');
                         return;
                     }
 
                     this.state.balance -= cost;
-                    this.state.upgrades.maxCapacity = (this.state.upgrades.maxCapacity || 50) + 50;
+                    this.state.upgrades.maxCapacity = Math.min(2000, currentCap + 150);
                     this.showToast(`Вместимость коллекции увеличена до ${this.state.upgrades.maxCapacity}!`, 'success');
                 } else if (type === 'favCapacity') {
-                    const cost = 250000;
+                    const currentFavCap = this.state.upgrades.maxFavCapacity || 3;
+                    if (currentFavCap >= 50) { this.showToast('Слоты Избранного уже максимальны: 50', 'info'); return; }
+                    const cost = Math.floor(250000 * Math.pow(1.7, Math.max(0, currentFavCap - 3)));
                     if (this.state.balance < cost) {
                         this.showToast(`Недостаточно ₽! Требуется ${cost.toLocaleString()} ₽`, 'error');
                         return;
                     }
 
                     this.state.balance -= cost;
-                    this.state.upgrades.maxFavCapacity = (this.state.upgrades.maxFavCapacity || 3) + 1;
+                    this.state.upgrades.maxFavCapacity = Math.min(50, currentFavCap + 1);
                     this.showToast(`Количество слотов Избранного увеличено до ${this.state.upgrades.maxFavCapacity}!`, 'success');
                 }
 
@@ -2036,7 +2084,8 @@
                     return;
                 }
 
-                grid.innerHTML = this.state.collection.map(item => `
+                const visibleItems = this.state.collection.slice(0, this.collectionRenderLimit);
+                grid.innerHTML = visibleItems.map(item => `
                     <div class="glass-card p-3 rounded-xl border border-slate-800 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${item.rarity.pillBg}">
@@ -2057,7 +2106,14 @@
                             </button>
                         </div>
                     </div>
-                `).join('');
+                `).join('') + (this.state.collection.length > visibleItems.length ? `
+                    <button onclick="app.showMoreCollection()" class="col-span-2 w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold">Показать ещё (${this.state.collection.length - visibleItems.length})</button>
+                ` : '');
+            }
+
+            showMoreCollection() {
+                this.collectionRenderLimit += 100;
+                this.renderCollection();
             }
 
             renderMarket() {
