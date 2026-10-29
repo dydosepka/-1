@@ -1485,8 +1485,6 @@ const SUPABASE_PUBLISHABLE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY';ани�
                     this.state.authPendingCode = null;
                     this.saveState();
                     this.renderCloudUI();
-                    try { await this.loadUserData(user.id); }
-                    catch (loadError) { console.error('Supabase profile load error:', loadError); this.showToast('Вход выполнен, но данные профиля не загрузились. Проверьте таблицы и RLS Supabase.', 'error'); }
                     this.showToast('Почта подтверждена! Вы вошли в аккаунт.', 'success');
                 } catch (error) {
                     console.error('Supabase OTP verify error:', error);
@@ -1557,158 +1555,49 @@ const SUPABASE_PUBLISHABLE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY';ани�
             // -------------------------------------------------------------
             // PROMOCODE SYSTEM (ADMIN + SETTINGS)
             // -------------------------------------------------------------
-            async activatePromocode() {
+            activatePromocode() {
                 const input = document.getElementById('promo-input-code');
                 const code = input ? input.value.trim().toUpperCase() : '';
+
                 if (!code) {
                     this.showToast('Введите промокод!', 'error');
                     return;
                 }
-                try {
-                    const result = await this.redeemPromocode(code);
-                    if (!result) return;
-                    if (input) input.value = '';
-                    this.updateUIHeader();
-                    this.renderCollection();
-                    this.renderAdminPromocodes();
-                } catch (error) {
-                    console.error('Promocode redemption error:', error);
-                    this.showToast(error?.message || 'Не удалось активировать промокод.', 'error');
-                }
-            }
 
-            async redeemPromocode(code) {
-                if (!supabaseClient) throw new Error('Supabase не настроен.');
-                const userId = this.state.cloudUser?.id;
-                if (!userId) {
-                    this.showToast('Войдите в аккаунт, чтобы активировать промокод.', 'error');
-                    return false;
-                }
-                const cleanCode = String(code || '').trim().toUpperCase();
-                const { data: promo, error } = await supabaseClient
-                    .from('promocodes')
-                    .select('*')
-                    .eq('code', cleanCode)
-                    .maybeSingle();
-                if (error) throw error;
+                const promo = this.state.promocodes.find(p => p.code.toUpperCase() === code);
+
                 if (!promo) {
-                    this.showToast('Промокод не найден или недействителен!', 'error');
-                    return false;
+                    this.showToast('Промокод не найден!', 'error');
+                    return;
                 }
-                const count = Number(promo.activation_count || 0);
-                const max = Number(promo.max_activations ?? 1);
-                if (promo.expires_at && Date.now() >= new Date(promo.expires_at).getTime()) {
+
+                if (promo.expiresAt && Date.now() >= promo.expiresAt) {
                     this.showToast('Срок действия этого промокода истёк!', 'error');
-                    return false;
-                }
-                if (max > 0 && count >= max) {
-                    this.showToast('Превышен лимит активаций данного промокода!', 'error');
-                    return false;
-                }
-                const amount = Number(promo.amount);
-                if (!Number.isFinite(amount) || amount <= 0 || !['rub', 'usd'].includes(promo.type)) {
-                    this.showToast('У промокода некорректные параметры.', 'error');
-                    return false;
+                    this.renderAdminPromocodes();
+                    return;
                 }
 
-                // Начисление и счётчик сохраняются в Supabase; баланс не меняется локально до подтверждения записи.
-                const { data: profile, error: profileError } = await supabaseClient
-                    .from('profiles').select('balance, usd_balance').eq('user_id', userId).maybeSingle();
-                if (profileError) throw profileError;
-                if (!profile) {
-                    this.showToast('Профиль игрока не найден в Supabase.', 'error');
-                    return false;
+                const maxUses = Number.isFinite(promo.maxActivations) ? promo.maxActivations : 1;
+                const uses = Number.isFinite(promo.activationCount) ? promo.activationCount : (promo.used ? 1 : 0);
+                if ((maxUses > 0 && uses >= maxUses) || (promo.used && !Number.isFinite(promo.maxActivations))) {
+                    this.showToast('Лимит активаций этого промокода исчерпан!', 'error');
+                    return;
                 }
-                const changes = promo.type === 'rub'
-                    ? { balance: Number(profile.balance || 0) + amount }
-                    : { usd_balance: Number(profile.usd_balance || 0) + amount };
-                const { error: balanceError } = await supabaseClient
-                    .from('profiles').update(changes).eq('user_id', userId);
-                if (balanceError) throw balanceError;
-                const { error: countError } = await supabaseClient
-                    .from('promocodes').update({ activation_count: count + 1 }).eq('code', cleanCode);
-                if (countError) {
-                    // Avoid leaving the UI claiming success if the activation counter failed.
-                    throw countError;
-                }
-                await this.loadUserData(userId);
-                this.showToast(`Промокод активирован! Начислено ${amount.toLocaleString()} ${promo.type.toUpperCase()}.`, 'success');
-                return true;
-            }
 
-            async adminGiveRewardToPlayer(targetUserId, rewardType, value) {
-                if (!supabaseClient) throw new Error('Supabase не настроен.');
-                const targetId = String(targetUserId || '').trim();
-                if (!targetId) throw new Error('Укажите ID игрока.');
-                const { data: player, error } = await supabaseClient
-                    .from('profiles').select('*').eq('user_id', targetId).maybeSingle();
-                if (error) throw error;
-                if (!player) {
-                    alert('Игрок с таким ID не найден!');
-                    return false;
+                promo.activationCount = uses + 1;
+                promo.used = maxUses > 0 && promo.activationCount >= maxUses;
+                if (promo.type === 'rub') {
+                    this.state.balance += promo.amount;
+                    this.showToast(`Промокод активирован! Начислено +${promo.amount.toLocaleString()} ₽`, 'success');
+                } else if (promo.type === 'usd') {
+                    this.state.usdBalance += promo.amount;
+                    this.showToast(`Промокод активирован! Начислено +${promo.amount.toLocaleString()} $`, 'success');
                 }
-                if (rewardType === 'rub' || rewardType === 'usd') {
-                    const amount = Number(value);
-                    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Сумма должна быть больше нуля.');
-                    const column = rewardType === 'rub' ? 'balance' : 'usd_balance';
-                    const newBalance = Number(player[column] || 0) + amount;
-                    const { error: updateError } = await supabaseClient.from('profiles')
-                        .update({ [column]: newBalance }).eq('user_id', targetId);
-                    if (updateError) throw updateError;
-                    alert(`Успешно начислено ${rewardType === 'rub' ? amount + ' руб.' : '$' + amount} для игрока ${targetId}`);
-                    return true;
-                }
-                if (rewardType === 'item') {
-                    const details = value && typeof value === 'object' ? value : {};
-                    const newItem = {
-                        id: 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-                        user_id: targetId,
-                        formatted_number: details.number || '+7 (999) 777-77-77',
-                        flag: details.flag || '🇷🇺',
-                        rarity_key: details.rarity || 'mythic',
-                        price: Number(details.price) || 1000000,
-                        pattern_desc: details.desc || 'Выдано администратором'
-                    };
-                    const { error: insertError } = await supabaseClient.from('user_items').insert([newItem]);
-                    if (insertError) throw insertError;
-                    alert(`Номер ${newItem.formatted_number} успешно выдан игроку ${targetId}`);
-                    return true;
-                }
-                throw new Error('Неизвестный тип награды.');
-            }
 
-            async loadUserData(userId) {
-                if (!supabaseClient || !userId) return false;
-                const { data: profile, error: profileError } = await supabaseClient
-                    .from('profiles').select('*').eq('user_id', userId).maybeSingle();
-                if (profileError) throw profileError;
-                if (profile) {
-                    this.state.balance = Number(profile.balance || 0);
-                    this.state.usdBalance = Number(profile.usd_balance || 0);
-                    if (profile.player_id) this.state.profile.userId = profile.player_id;
-                    if (profile.nickname) this.state.profile.nickname = profile.nickname;
-                }
-                const { data: items, error: itemsError } = await supabaseClient
-                    .from('user_items').select('*').eq('user_id', userId);
-                if (itemsError) throw itemsError;
-                if (Array.isArray(items)) {
-                    this.state.collection = items.map(item => ({
-                        id: item.id,
-                        formattedNumber: item.formatted_number || item.formattedNumber || '',
-                        flag: item.flag || '🇷🇺',
-                        rarityKey: item.rarity_key || item.rarityKey || 'common',
-                        rarity: item.rarity_key || item.rarity || 'common',
-                        price: Number(item.price || 0),
-                        patternDesc: item.pattern_desc || item.patternDesc || '',
-                        isFavorite: !!item.is_favorite
-                    }));
-                }
+                input.value = '';
                 this.saveState();
                 this.updateUIHeader();
-                this.renderProfileUI();
-                this.renderCollection();
-                this.renderFavorites();
-                return true;
+                this.renderAdminPromocodes();
             }
 
             adminCreatePromocode() {
@@ -2836,8 +2725,6 @@ const SUPABASE_PUBLISHABLE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY';ани�
         let app;
         window.onload = function() {
             app = new App();
-            window.app = app;
-            window.adminGiveRewardToPlayer = (...args) => app.adminGiveRewardToPlayer(...args);
             app.init();
 
             // Во время открытого генератора нажатие в любой свободной области экрана
