@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Canvas Confetti CDN -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
             background-color: #0b0d14;
@@ -454,7 +455,8 @@
             <div class="grid grid-cols-2 gap-3" id="event-secret-slots"></div>
             <div class="glass-panel p-4 rounded-2xl border border-fuchsia-500/30 space-y-3 text-center">
                 <h3 class="text-lg font-black text-white">🎁 Тайны и награды от разработчиков</h3>
-                <p class="text-sm text-slate-200 leading-relaxed">Чтобы разблокировать скрытые ячейки и забрать ценные подарки от команды разработчиков, вам предстоит пройти небольшое испытание — <strong class="text-fuchsia-300">соберите 4 секретных номера</strong>.</p>
+                <p class="text-sm text-slate-200 leading-relaxed">Чтобы разблокировать скрытые ячейки и забрать ценные подарки от команды разработчиков, вам предстоит пройти небольшое испытconst SUPABASE_URL = 'https://YOUR_PROJECT_REF.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY';ание — <strong class="text-fuchsia-300">соберите 4 секретных номера</strong>.</p>
                 <p class="text-sm text-slate-200 leading-relaxed">Как только вся комбинация окажется у вас: 📬 <strong>Напишите нам Telegram:</strong> <a href="https://t.me/clipths" target="_blank" rel="noopener noreferrer" class="font-black text-cyan-300 underline underline-offset-2">@clipths</a> — и заберите свою награду!</p>
             </div>
             <div class="glass-panel p-4 rounded-2xl border border-slate-800 space-y-2">
@@ -622,7 +624,7 @@
                 <!-- NOT REGISTERED / LOGGED OUT VIEW -->
                 <div id="cloud-auth-view" class="space-y-3">
                     <p class="text-xs text-slate-300">
-                        Зарегистрируйтесь по Email для автоматической синхронизации прогресса каждые 5 минут!
+                        Войдите по Email с настоящим проверочным кодом. Синхронизацию прогресса подключим после настройки базы данных.
                     </p>
 
                     <!-- STEP 1: ENTER EMAIL -->
@@ -872,6 +874,15 @@
 
     <!-- APPLICATION CODE -->
     <script>
+        // Supabase public client configuration. Fill these two values from
+        // Project Settings -> API. Never put a service_role/secret key here.
+        const SUPABASE_URL = 'https://eaqgoxnbzedlugirfwlb.supabase.co';
+        const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_0-aGnt7B11dVm8GPQZslEg_YL-zwmi7';
+        const supabaseClient = (window.supabase && SUPABASE_URL.includes('.supabase.co') && !SUPABASE_URL.includes('YOUR_PROJECT_REF') && !SUPABASE_PUBLISHABLE_KEY.startsWith('YOUR_'))
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+                auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+              })
+            : null;
         // -------------------------------------------------------------
         // MODULE 1: COUNTRY & NUMBER FORMATS
         // -------------------------------------------------------------
@@ -1387,81 +1398,111 @@
             // -------------------------------------------------------------
             // CLOUD SAVE & AUTHENTICATION SYSTEM
             // -------------------------------------------------------------
-            sendAuthVerificationCode() {
+            async sendAuthVerificationCode() {
                 const emailInput = document.getElementById('auth-email-input');
-                const email = emailInput ? emailInput.value.trim() : '';
+                const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
 
-                if (!email || !email.includes('@') || email.length < 5) {
-                    this.showToast('Пожалуйста, введите корректный адрес электронной почты!', 'error');
+                if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    this.showToast('Введите корректный адрес электронной почты.', 'error');
+                    return;
+                }
+                if (!supabaseClient) {
+                    this.showToast('Сначала настройте SUPABASE_URL и SUPABASE_PUBLISHABLE_KEY в index.html.', 'error');
                     return;
                 }
 
-                // Generate random 6-digit verification code
-                const code = Math.floor(100000 + Math.random() * 900000).toString();
-                this.state.authPendingEmail = email;
-                this.state.authPendingCode = code;
-
-                document.getElementById('auth-step-email').classList.add('hidden');
-                document.getElementById('auth-step-code').classList.remove('hidden');
-                document.getElementById('sent-email-display').textContent = email;
-
-                // Display code in toast for demonstration/user convenience
-                this.showToast(`[Email Service] Проверочный код: ${code}`, 'success');
+                const button = document.querySelector('#auth-step-email button');
+                if (button) button.disabled = true;
+                try {
+                    // Supabase sends the real email OTP. The email template must use {{ .Token }}.
+                    const { error } = await supabaseClient.auth.signInWithOtp({
+                        email,
+                        options: { shouldCreateUser: true }
+                    });
+                    if (error) throw error;
+                    this.state.authPendingEmail = email;
+                    document.getElementById('auth-step-email').classList.add('hidden');
+                    document.getElementById('auth-step-code').classList.remove('hidden');
+                    document.getElementById('sent-email-display').textContent = email;
+                    const codeInput = document.getElementById('auth-code-input');
+                    if (codeInput) { codeInput.value = ''; codeInput.focus(); }
+                    this.showToast('Проверочный код отправлен на вашу почту.', 'success');
+                } catch (error) {
+                    console.error('Supabase OTP send error:', error);
+                    this.showToast(error?.message || 'Не удалось отправить код. Проверьте настройки Email в Supabase.', 'error');
+                } finally {
+                    if (button) button.disabled = false;
+                }
             }
 
             cancelAuthStep() {
                 this.state.authPendingEmail = null;
                 this.state.authPendingCode = null;
-                document.getElementById('auth-step-code').classList.add('hidden');
-                document.getElementById('auth-step-email').classList.remove('hidden');
+                const codeStep = document.getElementById('auth-step-code');
+                const emailStep = document.getElementById('auth-step-email');
+                if (codeStep) codeStep.classList.add('hidden');
+                if (emailStep) emailStep.classList.remove('hidden');
             }
 
-            verifyAuthCode() {
+            async verifyAuthCode() {
                 const codeInput = document.getElementById('auth-code-input');
-                const enteredCode = codeInput ? codeInput.value.trim() : '';
+                const token = codeInput ? codeInput.value.trim() : '';
+                const email = this.state.authPendingEmail || (document.getElementById('auth-email-input')?.value || '').trim().toLowerCase();
 
-                if (enteredCode === this.state.authPendingCode) {
+                if (!supabaseClient) {
+                    this.showToast('Сначала настройте Supabase URL и публичный ключ в index.html.', 'error');
+                    return;
+                }
+                if (!email || !/^\d{6}$/.test(token)) {
+                    this.showToast('Введите email и 6-значный код из письма.', 'error');
+                    return;
+                }
+
+                try {
+                    const { data, error } = await supabaseClient.auth.verifyOtp({ email, token, type: 'email' });
+                    if (error) throw error;
+                    const user = data?.user;
+                    if (!user) throw new Error('Supabase не вернул пользователя. Попробуйте запросить новый код.');
+
                     this.state.cloudUser = {
-                        email: this.state.authPendingEmail,
+                        id: user.id,
+                        email: user.email || email,
                         lastSync: Date.now()
                     };
-                    
-                    // Save to user storage
-                    const cloudKey = `pnt_cloud_${this.state.cloudUser.email}`;
-                    localStorage.setItem(cloudKey, JSON.stringify(this.state));
-
                     this.state.authPendingEmail = null;
                     this.state.authPendingCode = null;
                     this.saveState();
                     this.renderCloudUI();
-                    this.showToast('Регистрация успешна! Облачное сохранение включено', 'success');
-                } else {
-                    this.showToast('Неверный проверочный код!', 'error');
+                    this.showToast('Почта подтверждена! Вы вошли в аккаунт.', 'success');
+                } catch (error) {
+                    console.error('Supabase OTP verify error:', error);
+                    this.showToast(error?.message || 'Неверный или просроченный код. Запросите новый.', 'error');
                 }
             }
 
             cloudSyncNow() {
                 if (!this.state.cloudUser) return;
-
+                // Authentication is live; game-state cloud persistence will be connected
+                // through protected database tables in the next setup step.
                 this.state.cloudUser.lastSync = Date.now();
                 this.saveState();
-
-                // Store cloud backup per account
-                const cloudKey = `pnt_cloud_${this.state.cloudUser.email}`;
-                localStorage.setItem(cloudKey, JSON.stringify(this.state));
-
                 this.renderCloudUI();
-                this.showToast('Данные успешно синхронизированы с облаком!', 'success');
+                this.showToast('Аккаунт подтверждён. Облачная синхронизация игрового прогресса будет включена после настройки базы.', 'info');
             }
 
-            cloudLogout() {
-                if (this.state.cloudUser) {
-                    this.cloudSyncNow(); // Final sync before exit
+            async cloudLogout() {
+                try {
+                    if (supabaseClient) {
+                        const { error } = await supabaseClient.auth.signOut();
+                        if (error) throw error;
+                    }
+                } catch (error) {
+                    console.error('Supabase sign-out error:', error);
                 }
                 this.state.cloudUser = null;
                 this.saveState();
                 this.renderCloudUI();
-                this.showToast('Вы успешно вышли из облачного аккаунта', 'info');
+                this.showToast('Вы вышли из аккаунта.', 'info');
             }
 
             startCloudAutoSyncTimer() {
@@ -2813,5 +2854,53 @@ const ROULETTE_SRC = "<!DOCTYPE html>\n<html lang=\"ru\">\n<head>\n<script>\n(fu
   window.addEventListener('load', setup);
 })();
 </script>
+
+<script id="basic-ui-protection">
+(() => {
+  function protect(target) {
+    if (!target || target.__uiProtected) return;
+    target.__uiProtected = true;
+    target.addEventListener('contextmenu', event => event.preventDefault());
+    target.addEventListener('keydown', event => {
+      const key = (event.key || '').toLowerCase();
+      if (
+        key === 'f12' ||
+        (event.ctrlKey && event.shiftKey && ['i', 'j', 'c'].includes(key)) ||
+        (event.ctrlKey && key === 'u')
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+  }
+
+  protect(document);
+
+  // Gifts roulette runs in an iframe, so apply the same protection inside it.
+  function protectGiftsFrame() {
+    const frame = document.getElementById('roulette-frame');
+    if (!frame) return;
+    frame.addEventListener('load', () => {
+      try {
+        protect(frame.contentDocument);
+      } catch (_) {
+        // The frame may be inaccessible if its origin changes.
+      }
+    });
+    try {
+      if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
+        protect(frame.contentDocument);
+      }
+    } catch (_) {}
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', protectGiftsFrame, { once: true });
+  } else {
+    protectGiftsFrame();
+  }
+})();
+</script>
+
 </body>
 </html>
