@@ -1658,86 +1658,76 @@ const SUPABASE_PUBLISHABLE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY';ани�
             async adminGiveRewardToPlayer(targetUserId, rewardType, value) {
                 if (!targetUserId) {
                     alert("Введите ID игрока!");
-                    return false;
-                }
-                if (!supabaseClient) {
-                    alert("Supabase не настроен!");
-                    return false;
+                    return;
                 }
 
+                // 1. Ищем игрока в таблице profiles по колонке id
                 const { data: player, error } = await supabaseClient
                     .from('profiles')
                     .select('*')
-                    .eq('user_id', targetUserId)
-                    .maybeSingle();
+                    .eq('id', targetUserId)
+                    .single();
 
                 if (error || !player) {
-                    console.error("Ошибка поиска игрока:", error);
                     alert("Игрок с таким ID не найден в базе данных Supabase!");
-                    return false;
+                    return;
                 }
 
+                // 2. Выдача рублей (колонка balance)
                 if (rewardType === 'rub') {
-                    const amount = Number(value);
-                    if (!Number.isFinite(amount) || amount <= 0) {
-                        alert("Укажите корректную сумму!");
-                        return false;
-                    }
-                    const newBalance = Number(player.balance || 0) + amount;
+                    const newBalance = Number(player.balance || 0) + Number(value);
                     const { error: updateErr } = await supabaseClient
                         .from('profiles')
                         .update({ balance: newBalance })
-                        .eq('user_id', targetUserId);
+                        .eq('id', targetUserId);
+
                     if (updateErr) {
-                        console.error("Ошибка обновления баланса:", updateErr);
+                        console.error(updateErr);
                         alert("Ошибка при обновлении баланса!");
-                        return false;
+                        return;
                     }
-                    alert(`Успешно начислено ${amount} руб. для игрока ${targetUserId}!`);
-                    return true;
-                } else if (rewardType === 'usd') {
-                    const amount = Number(value);
-                    if (!Number.isFinite(amount) || amount <= 0) {
-                        alert("Укажите корректную сумму!");
-                        return false;
-                    }
-                    const newUsd = Number(player.usd_balance || 0) + amount;
+                    alert(`Успешно начислено ${value} руб. для игрока ${targetUserId}!`);
+                }
+
+                // 3. Выдача долларов (колонка usd_balance)
+                else if (rewardType === 'usd') {
+                    const newUsd = Number(player.usd_balance || 0) + Number(value);
                     const { error: updateErr } = await supabaseClient
                         .from('profiles')
                         .update({ usd_balance: newUsd })
-                        .eq('user_id', targetUserId);
+                        .eq('id', targetUserId);
+
                     if (updateErr) {
-                        console.error("Ошибка обновления USD баланса:", updateErr);
+                        console.error(updateErr);
                         alert("Ошибка при обновлении USD баланса!");
-                        return false;
+                        return;
                     }
-                    alert(`Успешно начислено $${amount} для игрока ${targetUserId}!`);
-                    return true;
-                } else if (rewardType === 'item') {
-                    const details = value && typeof value === 'object' ? value : {};
+                    alert(`Успешно начислено $${value} для игрока ${targetUserId}!`);
+                }
+
+                // 4. Выдача номера в инвентарь (таблица user_items)
+                else if (rewardType === 'item') {
                     const newItem = {
                         id: 'item_' + Date.now(),
-                        user_id: targetUserId,
-                        formatted_number: details.number || "+7 (999) 777-77-77",
-                        flag: details.flag || "🇷🇺",
-                        rarity_key: details.rarity || "mythic",
-                        price: Number(details.price || 1000000),
-                        pattern_desc: details.desc || "Выдано администратором"
+                        user_id: targetUserId, // в user_items поле может называться user_id или id, проверим при необходимости
+                        formatted_number: value.number || "+7 (999) 777-77-77",
+                        flag: value.flag || "🇷🇺",
+                        rarity_key: value.rarity || "mythic",
+                        price: Number(value.price || 1000000),
+                        pattern_desc: value.desc || "Выдано администратором"
                     };
+
                     const { error: insertErr } = await supabaseClient
                         .from('user_items')
                         .insert([newItem]);
+
                     if (insertErr) {
-                        console.error("Ошибка добавления номера:", insertErr);
+                        console.error(insertErr);
                         alert("Ошибка при добавлении номера в инвентарь!");
-                        return false;
+                        return;
                     }
                     alert(`Номер ${newItem.formatted_number} успешно выдан игроку ${targetUserId}!`);
-                    return true;
                 }
-
-                alert("Неизвестный тип награды!");
-                return false;
             }
 
             async loadUserData(userId) {
