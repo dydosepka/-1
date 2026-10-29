@@ -776,6 +776,19 @@
                             </div>
                         </div>
 
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-1 font-semibold">Срок действия (часы)</label>
+                                <input type="number" id="admin-promo-duration" min="0" step="1" value="24" placeholder="0 = без срока" class="w-full bg-slate-900 border border-slate-800 text-xs font-mono px-3 py-2 rounded-xl text-white">
+                                <p class="text-[9px] text-slate-500 mt-1">0 — без ограничения по времени</p>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-1 font-semibold">Макс. активаций</label>
+                                <input type="number" id="admin-promo-max-uses" min="0" step="1" value="1" placeholder="0 = без лимита" class="w-full bg-slate-900 border border-slate-800 text-xs font-mono px-3 py-2 rounded-xl text-white">
+                                <p class="text-[9px] text-slate-500 mt-1">0 — без лимита</p>
+                            </div>
+                        </div>
+
                         <button onclick="app.adminCreatePromocode()" class="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs transition">
                             Создать Промокод
                         </button>
@@ -886,11 +899,11 @@
             // Сверхредкие экзотические серии
             { code: 'MYTH', country: 'Мифический (+880)', flag: '🌐', pattern: '+880 XXXX XXXX', formatDigits: 8, dropWeight: 0.001, forceRarity: 'mythic' },
             { code: 'ULT', country: 'Telegram (+888)', flag: '🌐', pattern: '+888 XXXX XXXX', formatDigits: 8, dropWeight: 0.003, forceRarity: 'ultra' },
-            // Секретные номера для ивента: общий шанс 0.0036%, немного выше +888
-            { code: 'SECRET_RU', country: 'Россия', flag: '🇷🇺', pattern: '+7 777 777 7777', formatDigits: 10, dropWeight: 0.0009, forceRarity: 'secret' },
-            { code: 'SECRET_MR', country: 'Мавритания', flag: '🇲🇷', pattern: '+222 22222222', formatDigits: 8, dropWeight: 0.0009, forceRarity: 'secret' },
-            { code: 'SECRET_US', country: 'США', flag: '🇺🇸', pattern: '+1 111 111 1111', formatDigits: 10, dropWeight: 0.0009, forceRarity: 'secret' },
-            { code: 'SECRET_UK', country: 'Великобритания', flag: '🇬🇧', pattern: '+44 444 444444', formatDigits: 9, dropWeight: 0.0009, forceRarity: 'secret' }
+            // Секретные номера для ивента: шанс снижен в 10 раз (общий вес 0.00036%)
+            { code: 'SECRET_RU', country: 'Россия', flag: '🇷🇺', pattern: '+7 777 777 7777', formatDigits: 10, dropWeight: 0.00009, forceRarity: 'secret' },
+            { code: 'SECRET_MR', country: 'Мавритания', flag: '🇲🇷', pattern: '+222 22222222', formatDigits: 8, dropWeight: 0.00009, forceRarity: 'secret' },
+            { code: 'SECRET_US', country: 'США', flag: '🇺🇸', pattern: '+1 111 111 1111', formatDigits: 10, dropWeight: 0.00009, forceRarity: 'secret' },
+            { code: 'SECRET_UK', country: 'Великобритания', flag: '🇬🇧', pattern: '+44 444 444444', formatDigits: 9, dropWeight: 0.00009, forceRarity: 'secret' }
         ];
 
         // -------------------------------------------------------------
@@ -988,11 +1001,11 @@
                     }
                 }
 
-                // Лёгкое снижение шанса эпика: 3% подходящих комбинаций
-                // понижаются до редкого. Порог эпика остаётся 55 очков.
+                // Очень небольшое снижение шанса эпика: 6% подходящих комбинаций
+                // понижаются до редкого. Порог эпика остаётся прежним.
                 // Шансы легендарного, мифика и экзотика не меняются.
                 if (!plan.forceRarity) {
-                    if (rarityKey === 'epic' && Math.random() < 0.05) {
+                    if (rarityKey === 'epic' && Math.random() < 0.06) {
                         rarityKey = 'rare';
                     } else if (rarityKey === 'mythic' && Math.random() >= 1 / 10000) {
                         rarityKey = 'rare';
@@ -1505,12 +1518,21 @@
                     return;
                 }
 
-                if (promo.used) {
-                    this.showToast('Этот промокод уже был активирован!', 'error');
+                if (promo.expiresAt && Date.now() >= promo.expiresAt) {
+                    this.showToast('Срок действия этого промокода истёк!', 'error');
+                    this.renderAdminPromocodes();
                     return;
                 }
 
-                promo.used = true;
+                const maxUses = Number.isFinite(promo.maxActivations) ? promo.maxActivations : 1;
+                const uses = Number.isFinite(promo.activationCount) ? promo.activationCount : (promo.used ? 1 : 0);
+                if ((maxUses > 0 && uses >= maxUses) || (promo.used && !Number.isFinite(promo.maxActivations))) {
+                    this.showToast('Лимит активаций этого промокода исчерпан!', 'error');
+                    return;
+                }
+
+                promo.activationCount = uses + 1;
+                promo.used = maxUses > 0 && promo.activationCount >= maxUses;
                 if (promo.type === 'rub') {
                     this.state.balance += promo.amount;
                     this.showToast(`Промокод активирован! Начислено +${promo.amount.toLocaleString()} ₽`, 'success');
@@ -1529,13 +1551,17 @@
                 const codeInput = document.getElementById('admin-promo-code');
                 const amountInput = document.getElementById('admin-promo-amount');
                 const typeInput = document.getElementById('admin-promo-type');
+                const durationInput = document.getElementById('admin-promo-duration');
+                const maxUsesInput = document.getElementById('admin-promo-max-uses');
 
                 const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
                 const amount = amountInput ? parseInt(amountInput.value) : 0;
                 const type = typeInput ? typeInput.value : 'rub';
+                const durationHours = durationInput ? Number(durationInput.value) : 24;
+                const maxActivations = maxUsesInput ? Number(maxUsesInput.value) : 1;
 
-                if (!code || isNaN(amount) || amount <= 0) {
-                    this.showToast('Укажите валидный код и сумму награды!', 'error');
+                if (!code || isNaN(amount) || amount <= 0 || !Number.isInteger(durationHours) || durationHours < 0 || !Number.isInteger(maxActivations) || maxActivations < 0) {
+                    this.showToast('Укажите код, сумму и корректные ограничения промокода!', 'error');
                     return;
                 }
 
@@ -1548,7 +1574,10 @@
                     code,
                     amount,
                     type,
-                    used: false
+                    used: false,
+                    activationCount: 0,
+                    maxActivations,
+                    expiresAt: durationHours > 0 ? Date.now() + durationHours * 60 * 60 * 1000 : null
                 });
 
                 if (codeInput) codeInput.value = '';
@@ -1556,7 +1585,7 @@
 
                 this.saveState();
                 this.renderAdminPromocodes();
-                this.showToast(`Промокод "${code}" на ${amount.toLocaleString()} ${type === 'rub' ? '₽' : '$'} успешно создан!`, 'success');
+                this.showToast(`Промокод "${code}" создан! Активаций: ${maxActivations || 'без лимита'}, срок: ${durationHours ? durationHours + ' ч.' : 'без ограничения'}.`, 'success');
             }
 
             renderAdminPromocodes() {
@@ -1568,17 +1597,26 @@
                     return;
                 }
 
-                list.innerHTML = this.state.promocodes.map(p => `
-                    <div class="flex items-center justify-between text-[11px] bg-slate-900/90 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                        <span class="font-mono font-bold ${p.used ? 'line-through text-slate-500' : 'text-purple-300'}">${p.code}</span>
-                        <div class="flex items-center gap-2">
-                            <span class="font-mono ${p.type === 'rub' ? 'text-amber-400' : 'text-emerald-400'}">+${p.amount.toLocaleString()} ${p.type === 'rub' ? '₽' : '$'}</span>
-                            <span class="text-[9px] px-1.5 py-0.5 rounded ${p.used ? 'bg-slate-800 text-slate-500' : 'bg-emerald-500/20 text-emerald-400'}">
-                                ${p.used ? 'Использован' : 'Активен'}
-                            </span>
+                list.innerHTML = this.state.promocodes.map(p => {
+                    const count = Number.isFinite(p.activationCount) ? p.activationCount : (p.used ? 1 : 0);
+                    const max = Number.isFinite(p.maxActivations) ? p.maxActivations : 1;
+                    const expired = !!(p.expiresAt && Date.now() >= p.expiresAt);
+                    const exhausted = max > 0 && count >= max;
+                    const status = expired ? 'Истёк' : exhausted ? 'Лимит исчерпан' : 'Активен';
+                    const statusClass = expired || exhausted ? 'bg-slate-800 text-slate-500' : 'bg-emerald-500/20 text-emerald-400';
+                    const expiryText = p.expiresAt ? new Date(p.expiresAt).toLocaleString('ru-RU') : 'без срока';
+                    return `
+                    <div class="flex flex-col gap-1 text-[11px] bg-slate-900/90 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-mono font-bold ${expired || exhausted ? 'line-through text-slate-500' : 'text-purple-300'}">${p.code}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono ${p.type === 'rub' ? 'text-amber-400' : 'text-emerald-400'}">+${p.amount.toLocaleString()} ${p.type === 'rub' ? '₽' : '$'}</span>
+                                <span class="text-[9px] px-1.5 py-0.5 rounded ${statusClass}">${status}</span>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                        <div class="text-[9px] text-slate-500">Активации: ${count}/${max > 0 ? max : '∞'} · До: ${expiryText}</div>
+                    </div>`;
+                }).join('');
             }
 
             // PROFILE SYSTEM
@@ -1822,7 +1860,8 @@
                 document.getElementById('drop-rarity-text').textContent = item.rarity.name;
                 document.getElementById('drop-rarity-text').style.color = item.rarityKey === 'secret' ? '#ffffff' : item.rarity.color;
                 document.getElementById('drop-rarity-text').classList.toggle('secret-rarity', item.rarityKey === 'secret');
-                document.getElementById('drop-price-tag').textContent = item.price.toLocaleString() + (item.rarityKey === 'secret' ? ' $' : ' ₽');
+                // Во время раскрытия редкого номера не показываем итоговую цену заранее.
+                document.getElementById('drop-price-tag').textContent = '';
                 document.getElementById('drop-country-flag').textContent = item.flag;
                 document.getElementById('drop-pattern-desc').textContent = 'Анализ комбинации...';
 
@@ -1867,7 +1906,7 @@
                             if (this.isAutoClickerEnabled) {
                                 this.startAutoClickerLoop();
                             }
-                        }, item.rarityKey === 'secret' ? '$' : '₽');
+                        }, item.rarityKey === 'secret' ? '$' : '₽', item.rarityKey);
                     }
                 }, 110);
             }
@@ -1952,13 +1991,16 @@
                 }
             }
 
-            animatePriceCounter(targetPrice, onComplete, currency = '₽') {
+            animatePriceCounter(targetPrice, onComplete, currency = '₽', rarityKey = 'epic') {
                 const priceTag = document.getElementById('drop-price-tag');
                 let currentVal = 0;
-                const duration = 1200;
+                const durations = { epic: 6000, legendary: 8000, mythic: 15000, ultra: 16000 };
+                const duration = durations[rarityKey] || 15000;
                 const startTime = performance.now();
 
                 if (this.priceCounterInterval) cancelAnimationFrame(this.priceCounterInterval);
+                // Цена появляется только в момент начала анимации подсчёта.
+                priceTag.textContent = '0 ' + currency;
 
                 const step = (currentTime) => {
                     const elapsed = currentTime - startTime;
