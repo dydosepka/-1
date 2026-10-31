@@ -1725,9 +1725,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
             startCloudAutoSyncTimer() {
                 if (this.cloudSyncTimer) clearInterval(this.cloudSyncTimer);
+                // Автосохранение прогресса в Supabase каждые 3 минуты для вошедшего игрока.
                 this.cloudSyncTimer = setInterval(() => {
-                    if (this.state.cloudUser?.id) this.cloudSyncNow();
-                }, 300000);
+                    const cloudUserId = this.state.cloudUser?.id;
+                    if (!cloudUserId) return;
+                    this.saveUserDataToCloud(cloudUserId)
+                        .then(() => console.log('Автосохранение в облако выполнено успешно.'))
+                        .catch(error => console.error('Ошибка автосохранения в облако:', error));
+                }, 3 * 60 * 1000);
             }
 
             renderCloudUI() {
@@ -3144,6 +3149,18 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                         .eq('id', player.id);
 
                     if (updateError) throw updateError;
+
+                    // Если администратор выдал валюту самому себе, сразу обновляем локальный баланс и экран.
+                    if (targetId === String(this.state.profile?.userId || '').trim()) {
+                        if (isUsd) {
+                            this.state.usdBalance = newBalance;
+                        } else {
+                            this.state.balance = newBalance;
+                        }
+                        this.saveState();
+                        this.updateUIHeader();
+                        this.renderProfileUI();
+                    }
 
                     this.showToast(`Успешно! Начислено ${amount.toLocaleString()} ${isUsd ? '$' : '₽'} игроку ${targetId}.`, 'success');
                 } catch (error) {
