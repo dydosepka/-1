@@ -132,6 +132,9 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 <div class="glass-panel px-3.5 py-2 rounded-2xl border border-slate-700/60 flex items-center gap-1.5">
                     <span id="global-usd" class="font-mono text-base font-black text-amber-400">50 $</span>
                 </div>
+                <div class="glass-panel px-3.5 py-2 rounded-2xl border border-slate-700/60 flex items-center gap-1.5">
+                    <span id="global-ton" class="font-mono text-base font-black text-sky-300">0 TON</span>
+                </div>
             </div>
         </div>
     </header>
@@ -261,9 +264,9 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     <p id="menu-profile-sub" class="text-[11px] text-slate-400">Настройка и статус</p>
                 </div>
 
-                <div onclick="app.switchTab('market')" class="glass-card p-4 rounded-2xl cursor-pointer hover:border-purple-500/50 transition">
-                    <div class="mb-2 w-6 h-6 flex items-center justify-center">
-                        <svg class="w-full h-full text-purple-400 fill-current" viewBox="0 0 100 100">
+                <div onclick="app.switchTab('market')" class="glass-card p-4 rounded-2xl cursor-pointer hover:border-purple-500/50 transition relative overflow-hidden group">
+                    <div class="menu-icon-tile text-purple-400 group-hover:scale-105 transition">
+                        <svg class="w-[22px] h-[22px] fill-current" viewBox="0 0 100 100" aria-hidden="true">
                             <path d="M 12,28 L 88,28 L 50,52 Z M 8,36 L 46,60 L 46,92 Z M 92,36 L 54,60 L 54,92 Z" />
                         </svg>
                     </div>
@@ -288,6 +291,12 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     <div class="menu-icon-tile text-amber-400"><i class="fa-solid fa-bolt"></i></div>
                     <h3 class="font-bold text-white text-sm">Улучшения</h3>
                     <p class="text-[11px] text-slate-400">Авто-прокрутка и слоты</p>
+                </div>
+
+                <div onclick="app.switchTab('auction')" class="glass-card p-4 rounded-2xl cursor-pointer hover:border-sky-400/60 transition relative overflow-hidden">
+                    <div class="menu-icon-tile text-sky-300"><i class="fa-solid fa-gavel"></i></div>
+                    <h3 class="font-bold text-white text-sm">Аукцион</h3>
+                    <p class="text-[11px] text-sky-200/80">Редкие номера за TON</p>
                 </div>
             </div>
 
@@ -460,6 +469,19 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             <div id="market-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-16">
                 <!-- Dynamic Items -->
             </div>
+        </section>
+
+        <!-- SECTION: TON AUCTION -->
+        <section id="sec-auction" class="hidden absolute inset-0 bg-[#0b0d14] z-30 p-4 overflow-y-auto space-y-4">
+            <div class="flex items-center justify-between">
+                <div><h2 class="text-xl font-black text-white">Аукцион</h2><p class="text-xs text-sky-300 mt-1">Покупка редких номеров за TON</p></div>
+                <button onclick="app.switchTab('menu')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="glass-panel p-4 rounded-2xl border border-sky-500/30 flex items-center justify-between">
+                <div><p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Ваш баланс</p><p id="auction-ton-balance" class="text-2xl font-black text-sky-300">0 TON</p></div>
+                <i class="fa-brands fa-telegram text-4xl text-sky-300"></i>
+            </div>
+            <div id="auction-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-16"></div>
         </section>
 
         <!-- SECTION: FAVORITES -->
@@ -789,7 +811,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     <input type="text" id="admin-target-user-id" placeholder="ID игрока (например PNT-ABC123-DEF456)" class="w-full bg-slate-900 border border-slate-800 text-xs font-mono px-3 py-2.5 rounded-xl text-white">
                     <div class="grid grid-cols-2 gap-2">
                         <input type="number" min="1" id="admin-target-reward-amount" placeholder="Сумма" class="min-w-0 w-full bg-slate-900 border border-slate-800 text-xs px-3 py-2 rounded-xl text-white">
-                        <select id="admin-target-reward-type" class="min-w-0 w-full bg-slate-900 border border-slate-800 text-xs px-3 py-2 rounded-xl text-white"><option value="rub">Рубли (₽)</option><option value="usd">Доллары ($)</option></select>
+                        <select id="admin-target-reward-type" class="min-w-0 w-full bg-slate-900 border border-slate-800 text-xs px-3 py-2 rounded-xl text-white"><option value="rub">Рубли (₽)</option><option value="usd">Доллары ($)</option><option value="ton">TON</option></select>
                     </div>
                     <button onclick="app.adminGrantCurrencyById()" class="w-full py-2.5 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white font-extrabold text-xs">Выдать валюту по ID</button>
                     <select id="admin-target-number-type" class="w-full bg-slate-900 border border-slate-800 text-xs px-3 py-2.5 rounded-xl text-white">
@@ -1166,6 +1188,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 this.state = {
                     balance: 450000,
                     usdBalance: 50,
+                    tonBalance: 0,
                     collection: [],
                     favorites: [],
                     eventSecretSold: [],
@@ -1225,6 +1248,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 this.renderProfileUI();
                 this.renderCollection();
                 this.renderMarket();
+                this.renderAuctionUI();
                 this.renderFavorites();
                 this.renderEventUI();
                 this.renderQuestsUI();
@@ -1390,6 +1414,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 const maxFavCap = this.state.upgrades.maxFavCapacity || 3;
                 document.getElementById('global-balance').textContent = this.state.balance.toLocaleString() + ' ₽';
                 document.getElementById('global-usd').textContent = this.state.usdBalance + ' $';
+                const tonBadge = document.getElementById('global-ton');
+                if (tonBadge) tonBadge.textContent = Number(this.state.tonBalance || 0).toLocaleString('en-US') + ' TON';
                 document.getElementById('coll-count-badge').textContent = `${this.state.collection.length} / ${maxCap}`;
                 const menuCollectionSub = document.getElementById('menu-collection-sub');
                 if (menuCollectionSub) menuCollectionSub.textContent = `${this.state.collection.length} / ${maxCap} номеров`;
@@ -1433,7 +1459,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             switchTab(tabId) {
                 if (this.isRevealing) return;
                 this.activeTab = tabId;
-                ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event'].forEach(s => {
+                ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event', 'auction'].forEach(s => {
                     const el = document.getElementById(`sec-${s}`);
                     if (el) el.classList.add('hidden');
                 });
@@ -1447,6 +1473,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (tabId === 'quests') this.renderQuestsUI();
                 if (tabId === 'upgrades') this.renderUpgradesUI();
                 if (tabId === 'event') this.renderEventUI();
+                if (tabId === 'auction') this.renderAuctionUI();
             }
 
             // -------------------------------------------------------------
@@ -1604,6 +1631,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     player_id: this.state.profile.userId, // передаем строковый ID вида PNT-...
                     balance: Number(this.state.balance || 0),
                     usd_balance: Number(this.state.usdBalance || 0),
+                    ton_balance: Number(this.state.tonBalance || 0),
                     nickname: this.state.profile?.nickname || null
                 };
                 const { error: profileError } = await supabaseClient
@@ -1639,6 +1667,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (profile) {
                     this.state.balance = Number(profile.balance || 0);
                     this.state.usdBalance = Number(profile.usd_balance || 0);
+                    this.state.tonBalance = Number(profile.ton_balance || 0);
                     if (profile.nickname) this.state.profile.nickname = profile.nickname;
                 }
                 this.state.collection = (items || []).map(item => ({
@@ -1946,6 +1975,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (profile) {
                     this.state.balance = Number(profile.balance || 0);
                     this.state.usdBalance = Number(profile.usd_balance || 0);
+                    this.state.tonBalance = Number(profile.ton_balance || 0);
                     if (profile.nickname) this.state.profile.nickname = profile.nickname;
                 }
 
@@ -2481,7 +2511,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                         this.state.profile.selectedNumberId = null;
                     }
 
-                    if (item.rarityKey === 'secret' || item.currency === 'usd') this.state.usdBalance = (this.state.usdBalance || 0) + item.price;
+                    if (item.currency === 'ton') this.state.tonBalance = (this.state.tonBalance || 0) + item.price;
+                    else if (item.rarityKey === 'secret' || item.currency === 'usd') this.state.usdBalance = (this.state.usdBalance || 0) + item.price;
                     else this.state.balance += item.price;
 
                     this.state.quests.sellCount = Math.min(100, this.state.quests.sellCount + 1);
@@ -2494,19 +2525,22 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     this.renderMarket();
                     this.renderFavorites();
                     this.renderEventUI();
-                    this.showToast(item.rarityKey === 'secret' ? `Секретный номер продан за ${item.price} $` : `Продано за ${item.price.toLocaleString()} ₽`, 'success');
+                    this.showToast(item.currency === 'ton' ? `Номер продан за ${item.price} TON` : (item.rarityKey === 'secret' ? `Секретный номер продан за ${item.price} $` : `Продано за ${item.price.toLocaleString()} ₽`), 'success');
                 }
             }
 
             executeBulkSell() {
                 let earned = 0;
                 let earnedUsd = 0;
+                let earnedTon = 0;
                 let soldAmount = 0;
                 const soldIds = new Set();
                 this.state.collection = this.state.collection.filter(item => {
                     if (this.selectedMarketIds.has(item.id)) {
                         soldIds.add(item.id);
-                        if (item.rarityKey === 'secret' || item.currency === 'usd') {
+                        if (item.currency === 'ton') {
+                            earnedTon += item.price;
+                        } else if (item.rarityKey === 'secret' || item.currency === 'usd') {
                             earnedUsd += item.price;
                             if (item.plan && !this.state.eventSecretSold.includes(item.plan.code)) this.state.eventSecretSold.push(item.plan.code);
                         } else earned += item.price;
@@ -2521,6 +2555,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
                 this.state.balance += earned;
                 this.state.usdBalance = (this.state.usdBalance || 0) + earnedUsd;
+                this.state.tonBalance = (this.state.tonBalance || 0) + earnedTon;
                 this.state.favorites = this.state.favorites.filter(item => !soldIds.has(item.id));
 
                 this.state.quests.sellCount = Math.min(100, this.state.quests.sellCount + soldAmount);
@@ -2533,7 +2568,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 this.renderMarket();
                 this.renderFavorites();
                 this.renderEventUI();
-                this.showToast(`Продано на сумму ${earned.toLocaleString()} ₽ и ${earnedUsd} $`, 'success');
+                this.showToast(`Продано на сумму ${earned.toLocaleString()} ₽, ${earnedUsd} $ и ${earnedTon} TON`, 'success');
             }
 
             renderQuestsUI() {
@@ -2785,7 +2820,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                             <div>
                                 <h4 class="font-black text-white text-xs">${item.formattedNumber}</h4>
                                 <span class="text-[10px] uppercase font-bold ${item.rarityKey === 'secret' ? 'secret-rarity' : ''}" style="${item.rarityKey === 'secret' ? '' : `color:${item.rarity.color}`} ">${item.rarity.name}</span>
-                                <p class="text-[10px] font-mono text-emerald-400 font-bold">${item.price.toLocaleString()} ${item.rarityKey === 'secret' || item.currency === 'usd' ? '$' : '₽'}</p>
+                                <p class="text-[10px] font-mono text-emerald-400 font-bold">${item.price.toLocaleString()} ${item.currency === 'ton' ? 'TON' : (item.rarityKey === 'secret' || item.currency === 'usd' ? '$' : '₽')}</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-1.5">
@@ -2805,6 +2840,56 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             showMoreCollection() {
                 this.collectionRenderLimit += 100;
                 this.renderCollection();
+            }
+
+            getAuctionLots() {
+                return [
+                    { id: 'ton-legendary-001', number: '+7 777 777 77 77', tier: 'Легендарный', rarityKey: 'legendary', price: 25, flag: '🇰🇿', desc: 'Золотая серия' },
+                    { id: 'ton-legendary-002', number: '+1 888 888 88 88', tier: 'Легендарный', rarityKey: 'legendary', price: 35, flag: '🇺🇸', desc: 'Повторяющиеся восьмёрки' },
+                    { id: 'ton-mythic-001', number: '+880 1111 2222', tier: 'Мифический', rarityKey: 'mythic', price: 100, flag: '🌐', desc: 'Мифическая серия' },
+                    { id: 'ton-mythic-002', number: '+880 7777 7777', tier: 'Мифический', rarityKey: 'mythic', price: 150, flag: '🌐', desc: 'Редкая повторяющаяся комбинация' },
+                    { id: 'ton-exotic-001', number: '+888 0000 0000', tier: 'Экзотический', rarityKey: 'ultra', price: 500, flag: '🌐', desc: 'Экзотическая серия' },
+                    { id: 'ton-exotic-002', number: '+888 8888 8888', tier: 'Экзотический', rarityKey: 'ultra', price: 750, flag: '🌐', desc: 'Максимально редкая комбинация' }
+                ];
+            }
+
+            renderAuctionUI() {
+                const grid = document.getElementById('auction-grid');
+                const balance = document.getElementById('auction-ton-balance');
+                if (balance) balance.textContent = Number(this.state.tonBalance || 0).toLocaleString('en-US') + ' TON';
+                if (!grid) return;
+                const lots = this.getAuctionLots();
+                grid.innerHTML = lots.map(lot => {
+                    const owned = (this.state.collection || []).some(item => item.auctionLotId === lot.id);
+                    const rarity = RARITIES[lot.rarityKey];
+                    return `<div class="glass-card p-4 rounded-2xl border border-slate-800 space-y-3">
+                        <div class="flex items-center justify-between"><span class="text-[10px] font-black uppercase tracking-wider" style="color:${rarity.color}">${lot.tier}</span><span class="text-[10px] text-slate-500">TON AUCTION</span></div>
+                        <div class="text-center py-3"><div class="text-2xl">${lot.flag}</div><div class="font-mono text-lg font-black text-white mt-2">${lot.number}</div><p class="text-[11px] text-slate-400 mt-1">${lot.desc}</p></div>
+                        <div class="flex items-center justify-between"><span class="font-black text-sky-300">${lot.price} TON</span><button onclick="app.buyAuctionLot('${lot.id}')" ${owned ? 'disabled' : ''} class="px-4 py-2 rounded-xl ${owned ? 'bg-slate-700 text-slate-400' : 'bg-sky-600 hover:bg-sky-500 text-white'} text-xs font-black disabled:cursor-not-allowed">${owned ? 'Куплено' : 'Купить'}</button></div>
+                    </div>`;
+                }).join('');
+            }
+
+            buyAuctionLot(lotId) {
+                const lot = this.getAuctionLots().find(x => x.id === lotId);
+                if (!lot) return;
+                if ((this.state.collection || []).some(item => item.auctionLotId === lot.id)) {
+                    this.showToast('Этот номер уже куплен.', 'error'); return;
+                }
+                const balance = Number(this.state.tonBalance || 0);
+                if (balance < lot.price) { this.showToast('Недостаточно TON для покупки.', 'error'); return; }
+                const item = {
+                    id: 'auction_' + lot.id + '_' + Date.now(), auctionLotId: lot.id,
+                    plan: { country: 'TON Auction', code: 'TON', flag: lot.flag, pattern: lot.number, formatDigits: 0 },
+                    formattedNumber: lot.number, flag: lot.flag, rarityKey: lot.rarityKey,
+                    rarity: RARITIES[lot.rarityKey], price: lot.price, currency: 'ton',
+                    patternDesc: 'Куплено на TON-аукционе: ' + lot.desc, isFavorite: false
+                };
+                this.state.tonBalance = balance - lot.price;
+                this.state.collection.unshift(item);
+                this.saveState(); this.updateUIHeader(); this.renderAuctionUI(); this.renderCollection();
+                if (this.state.cloudUser?.id) this.saveUserDataToCloud(this.state.cloudUser.id).catch(err => console.error('Ошибка облачного сохранения покупки:', err));
+                this.showToast('Номер успешно куплен за ' + lot.price + ' TON!', 'success');
             }
 
             renderMarket() {
@@ -2840,7 +2925,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                                 <div class="min-w-0">
                                     <h4 class="font-bold text-white text-xs">${item.flag} ${item.formattedNumber}</h4>
                                     <span class="text-[10px] uppercase font-bold ${item.rarityKey === 'secret' ? 'secret-rarity' : ''}" style="${item.rarityKey === 'secret' ? '' : `color:${item.rarity.color}`} ">${item.rarity.name}</span>
-                                    <p class="font-mono text-xs font-black text-emerald-400">${item.price.toLocaleString()} ${item.rarityKey === 'secret' || item.currency === 'usd' ? '$' : '₽'}</p>
+                                    <p class="font-mono text-xs font-black text-emerald-400">${item.price.toLocaleString()} ${item.currency === 'ton' ? 'TON' : (item.rarityKey === 'secret' || item.currency === 'usd' ? '$' : '₽')}</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-1 shrink-0">
@@ -2966,7 +3051,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 const idx = this.state.collection.findIndex(x => x.id === item.id);
                 if (idx < 0) return false;
                 this.state.collection.splice(idx, 1);
-                if (item.currency === 'usd') this.state.usdBalance = (this.state.usdBalance || 0) + item.price;
+                if (item.currency === 'ton') this.state.tonBalance = (this.state.tonBalance || 0) + item.price;
+                else if (item.currency === 'usd') this.state.usdBalance = (this.state.usdBalance || 0) + item.price;
                 else this.state.balance += item.price;
                 this.state.quests.sellCount = Math.min(100, this.state.quests.sellCount + 1);
                 this.state.quests.salesEarnings = Math.min(5000000, this.state.quests.salesEarnings + (item.currency === 'usd' ? 0 : item.price));
@@ -3129,7 +3215,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     // Ищем игрока по текстовому player_id (вида PNT-...)
                     const { data: player, error: selectError } = await supabaseClient
                         .from('profiles')
-                        .select('id, player_id, balance, usd_balance')
+                        .select('id, player_id, balance, usd_balance, ton_balance')
                         .eq('player_id', targetId)
                         .maybeSingle();
 
@@ -3139,8 +3225,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                         return;
                     }
 
+                    const balanceColumn = type === 'ton' ? 'ton_balance' : (type === 'usd' ? 'usd_balance' : 'balance');
                     const isUsd = type === 'usd';
-                    const balanceColumn = isUsd ? 'usd_balance' : 'balance';
                     const newBalance = Number(player[balanceColumn] || 0) + amount;
 
                     const { error: updateError } = await supabaseClient
@@ -3152,7 +3238,9 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
                     // Если администратор выдал валюту самому себе, сразу обновляем локальный баланс и экран.
                     if (targetId === String(this.state.profile?.userId || '').trim()) {
-                        if (isUsd) {
+                        if (type === 'ton') {
+                            this.state.tonBalance = newBalance;
+                        } else if (isUsd) {
                             this.state.usdBalance = newBalance;
                         } else {
                             this.state.balance = newBalance;
@@ -3162,7 +3250,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                         this.renderProfileUI();
                     }
 
-                    this.showToast(`Успешно! Начислено ${amount.toLocaleString()} ${isUsd ? '$' : '₽'} игроку ${targetId}.`, 'success');
+                    this.showToast(`Успешно! Начислено ${amount.toLocaleString()} ${type === 'ton' ? 'TON' : (isUsd ? '$' : '₽')} игроку ${targetId}.`, 'success');
                 } catch (error) {
                     console.error('Ошибка выдачи валюты через Supabase:', error);
                     this.showToast('Не удалось выдать валюту. Проверьте консоль.', 'error');
@@ -3341,7 +3429,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       if (tabId === 'roulette') {
         // Remember the currently open number-game screen before switching modes.
         if (this.activeTab && this.activeTab !== 'roulette') lastMain = this.activeTab;
-        ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event'].forEach(name => {
+        ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event', 'auction'].forEach(name => {
           const el = document.getElementById(`sec-${name}`);
           if (el) el.classList.add('hidden');
         });
