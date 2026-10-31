@@ -653,63 +653,37 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     </span>
                 </div>
 
-                <!-- NOT REGISTERED / LOGGED OUT VIEW -->
-                <div id="cloud-auth-view" class="space-y-3">
-                    <p class="text-xs text-slate-300">
-                        Войдите по Email с настоящим проверочным кодом. Синхронизацию прогресса подключим после настройки базы данных.
-                    </p>
-
-                    <!-- STEP 1: ENTER EMAIL -->
-                    <div id="auth-step-email" class="space-y-2">
-                        <input type="email" id="auth-email-input" placeholder="Введите ваш Email..." class="w-full bg-slate-900 border border-slate-800 text-xs px-3.5 py-2.5 rounded-xl text-white focus:outline-none focus:border-cyan-500">
-                        <button onclick="app.sendAuthVerificationCode()" class="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-extrabold text-xs transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-paper-plane"></i> Отправить проверочный код
-                        </button>
-                    </div>
-
-                    <!-- STEP 2: ENTER CODE (HIDDEN INITIALLY) -->
-                    <div id="auth-step-code" class="hidden space-y-2">
-                        <p class="text-[11px] text-amber-300 font-semibold">
-                            Проверочный код отправлен на почту <span id="sent-email-display" class="underline"></span>
-                        </p>
-                        <input type="text" id="auth-code-input" placeholder="Введите 6-значный код..." maxlength="6" class="w-full bg-slate-900 border border-slate-800 text-center font-mono text-sm tracking-widest px-3.5 py-2.5 rounded-xl text-white focus:outline-none focus:border-cyan-500">
-                        <div class="flex gap-2">
-                            <button onclick="app.verifyAuthCode()" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs transition">
-                                Подтвердить Вход
-                            </button>
-                            <button onclick="app.cancelAuthStep()" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs">
-                                Отмена
-                            </button>
+                <!-- СОСТОЯНИЕ ДО ВХОДА -->
+                <div id="cloudLoggedOut" class="cloud-panel space-y-3">
+                    <p class="text-xs text-slate-300">Прогресс хранится только в этом браузере</p>
+                    <button id="btnLoginPrompt" onclick="app.showLoginPrompt()" class="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-extrabold text-xs">Войти по почте</button>
+                    <div id="cloud-auth-view" class="hidden space-y-3">
+                        <div id="auth-step-email" class="space-y-2">
+                            <input type="email" id="auth-email-input" placeholder="Введите ваш Email..." class="w-full bg-slate-900 border border-slate-800 text-xs px-3.5 py-2.5 rounded-xl text-white focus:outline-none focus:border-cyan-500">
+                            <button onclick="app.sendAuthVerificationCode()" class="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-extrabold text-xs">Отправить проверочный код</button>
+                        </div>
+                        <div id="auth-step-code" class="hidden space-y-2">
+                            <p class="text-[11px] text-amber-300 font-semibold">Код отправлен на <span id="sent-email-display" class="underline"></span></p>
+                            <input type="text" id="auth-code-input" placeholder="Введите 6-значный код..." maxlength="6" class="w-full bg-slate-900 border border-slate-800 text-center font-mono text-sm tracking-widest px-3.5 py-2.5 rounded-xl text-white">
+                            <div class="flex gap-2">
+                                <button onclick="app.verifyAuthCode()" class="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold text-xs">Подтвердить вход</button>
+                                <button onclick="app.cancelAuthStep()" class="py-2.5 px-3 rounded-xl bg-slate-800 text-slate-300 text-xs">Отмена</button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- LOGGED IN VIEW -->
-                <div id="cloud-user-view" class="hidden space-y-3">
-                    <div class="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                        <div class="flex items-center gap-2 overflow-hidden">
-                            <i class="fa-solid fa-circle-user text-emerald-400 text-lg"></i>
-                            <span id="user-email-display" class="text-xs text-slate-200 font-mono truncate">user@mail.com</span>
-                        </div>
-                        <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 shrink-0">
-                            Синхронизировано
-                        </span>
+                <!-- СОСТОЯНИЕ ПОСЛЕ ВХОДА -->
+                <div id="cloudLoggedIn" class="cloud-panel hidden space-y-3" style="display:none;">
+                    <div class="user-info-row flex items-center justify-between bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                        <span id="userEmailDisplay" class="text-xs text-slate-200 font-mono truncate">email@gmail.com</span>
+                        <span class="sync-status-badge text-[10px] text-emerald-400 font-bold">Синхронизировано</span>
                     </div>
-
-                    <p class="text-[11px] text-slate-400">
-                        Автосохранение каждые 5 мин. <br>
-                        Последняя синхронизация: <strong id="last-sync-time" class="text-slate-300">Никогда</strong>
-                    </p>
-
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="app.cloudSyncNow()" class="py-2.5 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-extrabold text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-600/20">
-                            <i class="fa-solid fa-rotate text-xs"></i>
-                            <span>Сохранить сейчас</span>
-                        </button>
-                        <button onclick="app.cloudLogout()" class="py-2.5 px-3 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 font-bold text-xs transition flex items-center justify-center gap-1.5">
-                            <i class="fa-solid fa-right-from-bracket text-xs"></i>
-                            <span>Выйти</span>
-                        </button>
+                    <p class="text-[11px] text-slate-400">Последняя синхронизация: <strong id="last-sync-time" class="text-slate-300">Никогда</strong></p>
+                    <div class="cloud-buttons-grid grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button id="btnSaveCloud" onclick="app.cloudSyncNow()" class="py-2.5 px-3 rounded-xl bg-cyan-600 text-slate-950 font-extrabold text-xs">Сохранить сейчас</button>
+                        <button id="btnLoadCloud" onclick="app.cloudLoadNow()" class="py-2.5 px-3 rounded-xl bg-slate-700 text-white font-extrabold text-xs">Загрузить из облака</button>
+                        <button id="btnLogout" onclick="app.cloudLogout()" class="py-2.5 px-3 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 font-bold text-xs">Выйти</button>
                     </div>
                 </div>
             </div>
@@ -757,6 +731,17 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             <button onclick="app.resetGameData()" class="w-full py-2.5 rounded-xl bg-rose-950/40 border border-rose-700/50 text-rose-300 hover:bg-rose-900/40 font-bold text-xs transition">
                 <i class="fa-solid fa-trash-can mr-1.5"></i> Сбросить весь локальный прогресс
             </button>
+        </div>
+    </div>
+
+    <!-- CONFLICT MODAL: LOCAL VS CLOUD PROGRESS -->
+    <div id="conflictModal" class="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md items-center justify-center p-4" style="display:none;">
+        <div class="glass-card w-full max-w-md rounded-2xl p-5 border border-amber-500/40 shadow-2xl space-y-4">
+            <p class="text-sm font-bold text-white">Обнаружен разный прогресс на устройстве и в облаке. Какой вариант оставить?</p>
+            <div class="conflict-buttons grid gap-2">
+                <button id="btnKeepLocal" class="w-full py-3 rounded-xl bg-cyan-600 text-slate-950 font-extrabold text-xs">Оставить этот (устройство: <span id="localBalanceVal">0</span> ₽)</button>
+                <button id="btnKeepCloud" class="w-full py-3 rounded-xl bg-slate-700 text-white font-extrabold text-xs">Загрузить из облака (<span id="cloudBalanceVal">0</span> ₽)</button>
+            </div>
         </div>
     </div>
 
@@ -1521,6 +1506,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 const emailStep = document.getElementById('auth-step-email');
                 if (codeStep) codeStep.classList.add('hidden');
                 if (emailStep) emailStep.classList.remove('hidden');
+                const authView = document.getElementById('cloud-auth-view');
+                if (authView) authView.classList.add('hidden');
             }
 
             async verifyAuthCode() {
@@ -1543,17 +1530,9 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     const user = data?.user;
                     if (!user) throw new Error('Supabase не вернул пользователя. Попробуйте запросить новый код.');
 
-                    this.state.cloudUser = {
-                        id: user.id,
-                        email: user.email || email,
-                        lastSync: Date.now()
-                    };
                     this.state.authPendingEmail = null;
                     this.state.authPendingCode = null;
-                    this.saveState();
-                    this.renderCloudUI();
-                    try { await this.loadUserData(user.id); }
-                    catch (loadError) { console.error('Supabase profile load error:', loadError); this.showToast('Вход выполнен, но данные профиля не загрузились. Проверьте таблицы и RLS Supabase.', 'error'); }
+                    await this.handleSuccessfulLogin(user);
                     this.showToast('Почта подтверждена! Вы вошли в аккаунт.', 'success');
                 } catch (error) {
                     console.error('Supabase OTP verify error:', error);
@@ -1561,14 +1540,170 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 }
             }
 
-            cloudSyncNow() {
-                if (!this.state.cloudUser) return;
-                // Authentication is live; game-state cloud persistence will be connected
-                // through protected database tables in the next setup step.
-                this.state.cloudUser.lastSync = Date.now();
+            showLoginPrompt() {
+                const authView = document.getElementById('cloud-auth-view');
+                if (authView) authView.classList.remove('hidden');
+                const emailInput = document.getElementById('auth-email-input');
+                if (emailInput) emailInput.focus();
+            }
+
+            async handleSuccessfulLogin(user) {
+                if (!supabaseClient || !user?.id) throw new Error('Не удалось определить пользователя Supabase.');
+                this.state.cloudUser = { id: user.id, email: user.email || '', lastSync: Date.now() };
+                this.saveState();
+
+                const { data: cloudProfile, error: profileError } = await supabaseClient
+                    .from('profiles').select('*').eq('id', user.id).maybeSingle();
+                if (profileError) throw profileError;
+
+                const { data: cloudItems, error: itemsError } = await supabaseClient
+                    .from('user_items').select('*').eq('user_id', user.id);
+                if (itemsError) throw itemsError;
+
+                const localBalance = Number(this.state.balance || 0);
+                const localUsd = Number(this.state.usdBalance || 0);
+                const localItems = Array.isArray(this.state.collection) ? this.state.collection : [];
+                const hasLocalProgress = localBalance > 450000 || localUsd !== 50 || localItems.length > 0;
+                const cloudBalance = Number(cloudProfile?.balance ?? 450000);
+                const cloudUsd = Number(cloudProfile?.usd_balance ?? 50);
+                const cloudHasData = !!cloudProfile && (cloudBalance !== 450000 || cloudUsd !== 50 || (cloudItems || []).length > 0 || !!(cloudProfile.data && Object.keys(cloudProfile.data).length));
+
+                this._pendingCloudProfile = cloudProfile;
+                this._pendingCloudItems = cloudItems || [];
+                this._pendingCloudUserId = user.id;
+
+                if (!cloudHasData) {
+                    await this.saveUserDataToCloud(user.id);
+                    this.showToast(hasLocalProgress ? 'Прогресс с устройства перенесён в облако.' : 'Облачный профиль создан.', 'success');
+                    this.renderCloudUI();
+                    return true;
+                }
+
+                const localSnapshot = localItems.map(x => ({ number: x.formattedNumber || '', price: Number(x.price || 0), rarity: x.rarityKey || x.rarity || '', flag: x.flag || '' }));
+                const cloudSnapshot = (cloudItems || []).map(x => ({ number: x.formatted_number || x.formattedNumber || '', price: Number(x.price || 0), rarity: x.rarity_key || x.rarity || '', flag: x.flag || '' }));
+                const differs = localBalance !== cloudBalance || localUsd !== cloudUsd || JSON.stringify(localSnapshot) !== JSON.stringify(cloudSnapshot);
+
+                if (hasLocalProgress && differs) {
+                    document.getElementById('localBalanceVal').textContent = localBalance.toLocaleString('ru-RU');
+                    document.getElementById('cloudBalanceVal').textContent = cloudBalance.toLocaleString('ru-RU');
+                    const modal = document.getElementById('conflictModal');
+                    if (modal) modal.style.display = 'flex';
+                    this.renderCloudUI();
+                    return true;
+                }
+
+                this.applyCloudData(cloudProfile, cloudItems);
+                this.renderCloudUI();
+                return true;
+            }
+
+            async saveUserDataToCloud(userId) {
+                if (!supabaseClient || !userId) throw new Error('Сначала войдите в аккаунт.');
+                const profileRow = {
+                    id: userId,
+                    balance: Number(this.state.balance || 0),
+                    usd_balance: Number(this.state.usdBalance || 0),
+                    nickname: this.state.profile?.nickname || null
+                };
+                const { error: profileError } = await supabaseClient
+                    .from('profiles').upsert(profileRow, { onConflict: 'id' });
+                if (profileError) throw profileError;
+
+                const { error: deleteError } = await supabaseClient
+                    .from('user_items').delete().eq('user_id', userId);
+                if (deleteError) throw deleteError;
+
+                const items = (this.state.collection || []).map((item, index) => ({
+                    id: String(item.id || `item_${userId}_${index}_${Date.now()}`),
+                    user_id: userId,
+                    formatted_number: item.formattedNumber || item.formatted_number || '',
+                    flag: item.flag || '🇷🇺',
+                    rarity_key: item.rarityKey || item.rarity_key || item.rarity || 'common',
+                    price: Number(item.price || 0),
+                    pattern_desc: item.patternDesc || item.pattern_desc || '',
+                    is_favorite: !!item.isFavorite
+                }));
+                if (items.length) {
+                    const { error: insertError } = await supabaseClient.from('user_items').insert(items);
+                    if (insertError) throw insertError;
+                }
+
+                this.state.cloudUser = { ...(this.state.cloudUser || {}), id: userId, lastSync: Date.now() };
                 this.saveState();
                 this.renderCloudUI();
-                this.showToast('Аккаунт подтверждён. Облачная синхронизация игрового прогресса будет включена после настройки базы.', 'info');
+                return true;
+            }
+
+            applyCloudData(profile, items = []) {
+                if (profile) {
+                    this.state.balance = Number(profile.balance || 0);
+                    this.state.usdBalance = Number(profile.usd_balance || 0);
+                    if (profile.nickname) this.state.profile.nickname = profile.nickname;
+                }
+                this.state.collection = (items || []).map(item => ({
+                    id: item.id,
+                    formattedNumber: item.formatted_number || item.formattedNumber || '',
+                    flag: item.flag || '🇷🇺',
+                    rarityKey: item.rarity_key || item.rarityKey || 'common',
+                    rarity: item.rarity_key || item.rarity || 'common',
+                    price: Number(item.price || 0),
+                    patternDesc: item.pattern_desc || item.patternDesc || '',
+                    isFavorite: !!item.is_favorite
+                }));
+                this.state.favorites = this.state.collection.filter(x => x.isFavorite).map(x => x.id);
+                this.saveState();
+                this.updateUIHeader();
+                this.renderProfileUI();
+                this.renderCollection();
+                this.renderFavorites();
+            }
+
+            async cloudSyncNow() {
+                if (!this.state.cloudUser?.id) return this.showToast('Сначала войдите в аккаунт.', 'error');
+                try {
+                    await this.saveUserDataToCloud(this.state.cloudUser.id);
+                    this.showToast('Прогресс сохранён в облаке.', 'success');
+                } catch (error) {
+                    console.error('Cloud save error:', error);
+                    this.showToast(error?.message || 'Не удалось сохранить прогресс в облаке.', 'error');
+                }
+            }
+
+            async cloudLoadNow() {
+                if (!this.state.cloudUser?.id) return this.showToast('Сначала войдите в аккаунт.', 'error');
+                try {
+                    const userId = this.state.cloudUser.id;
+                    const { data: profile, error: profileError } = await supabaseClient.from('profiles').select('*').eq('id', userId).maybeSingle();
+                    if (profileError) throw profileError;
+                    const { data: items, error: itemsError } = await supabaseClient.from('user_items').select('*').eq('user_id', userId);
+                    if (itemsError) throw itemsError;
+                    if (!profile) throw new Error('Облачный профиль не найден. Сначала сохраните прогресс.');
+                    this.applyCloudData(profile, items || []);
+                    this.state.cloudUser.lastSync = Date.now();
+                    this.saveState();
+                    this.renderCloudUI();
+                    this.showToast('Прогресс загружен из облака.', 'success');
+                } catch (error) {
+                    console.error('Cloud load error:', error);
+                    this.showToast(error?.message || 'Не удалось загрузить прогресс из облака.', 'error');
+                }
+            }
+
+            async chooseLocalProgress() {
+                try {
+                    await this.saveUserDataToCloud(this._pendingCloudUserId || this.state.cloudUser?.id);
+                    const modal = document.getElementById('conflictModal'); if (modal) modal.style.display = 'none';
+                    this.showToast('Сохранён прогресс с этого устройства.', 'success');
+                } catch (error) {
+                    console.error('Keep local progress error:', error);
+                    this.showToast(error?.message || 'Не удалось сохранить локальный прогресс.', 'error');
+                }
+            }
+
+            chooseCloudProgress() {
+                this.applyCloudData(this._pendingCloudProfile, this._pendingCloudItems || []);
+                const modal = document.getElementById('conflictModal'); if (modal) modal.style.display = 'none';
+                this.showToast('Загружены данные из облака.', 'success');
             }
 
             async cloudLogout() {
@@ -1577,47 +1712,44 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                         const { error } = await supabaseClient.auth.signOut();
                         if (error) throw error;
                     }
+                    this.state.cloudUser = null;
+                    this.saveState();
+                    this.renderCloudUI();
+                    this.showToast('Вы вышли из аккаунта. Прогресс этого браузера сохранён локально.', 'info');
                 } catch (error) {
                     console.error('Supabase sign-out error:', error);
+                    this.showToast(error?.message || 'Не удалось выйти из аккаунта.', 'error');
                 }
-                this.state.cloudUser = null;
-                this.saveState();
-                this.renderCloudUI();
-                this.showToast('Вы вышли из аккаунта.', 'info');
             }
 
             startCloudAutoSyncTimer() {
                 if (this.cloudSyncTimer) clearInterval(this.cloudSyncTimer);
-                // Sync every 5 minutes (300,000 ms)
                 this.cloudSyncTimer = setInterval(() => {
-                    if (this.state.cloudUser) {
-                        this.cloudSyncNow();
-                    }
+                    if (this.state.cloudUser?.id) this.cloudSyncNow();
                 }, 300000);
             }
 
             renderCloudUI() {
+                const loggedOut = document.getElementById('cloudLoggedOut');
+                const loggedIn = document.getElementById('cloudLoggedIn');
                 const authView = document.getElementById('cloud-auth-view');
-                const userView = document.getElementById('cloud-user-view');
                 const badge = document.getElementById('cloud-status-badge');
-
-                if (!authView || !userView || !badge) return;
-
-                if (this.state.cloudUser) {
-                    authView.classList.add('hidden');
-                    userView.classList.remove('hidden');
-                    badge.textContent = 'Онлайн';
-                    badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
-
-                    document.getElementById('user-email-display').textContent = this.state.cloudUser.email;
-                    
-                    const syncDate = new Date(this.state.cloudUser.lastSync);
-                    document.getElementById('last-sync-time').textContent = syncDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                } else {
-                    authView.classList.remove('hidden');
-                    userView.classList.add('hidden');
-                    badge.textContent = 'Офлайн';
-                    badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400';
+                if (!loggedOut || !loggedIn || !badge) return;
+                const isLoggedIn = !!this.state.cloudUser?.id;
+                loggedOut.classList.toggle('hidden', isLoggedIn);
+                loggedIn.classList.toggle('hidden', !isLoggedIn);
+                loggedIn.style.display = isLoggedIn ? 'block' : 'none';
+                loggedOut.style.display = isLoggedIn ? 'none' : 'block';
+                if (authView && !isLoggedIn) authView.classList.add('hidden');
+                badge.textContent = isLoggedIn ? 'Онлайн' : 'Офлайн';
+                badge.className = isLoggedIn
+                    ? 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400';
+                if (isLoggedIn) {
+                    const email = this.state.cloudUser.email || '';
+                    const emailNode = document.getElementById('userEmailDisplay'); if (emailNode) emailNode.textContent = email;
+                    const syncNode = document.getElementById('last-sync-time');
+                    if (syncNode) syncNode.textContent = new Date(this.state.cloudUser.lastSync || Date.now()).toLocaleTimeString('ru-RU');
                 }
             }
 
@@ -3062,6 +3194,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
         let app;
         window.onload = function() {
             app = new App();
+            document.getElementById('btnKeepLocal')?.addEventListener('click', () => app.chooseLocalProgress());
+            document.getElementById('btnKeepCloud')?.addEventListener('click', () => app.chooseCloudProgress());
             window.app = app;
             window.adminGiveRewardToPlayer = (...args) => app.adminGiveRewardToPlayer(...args);
             app.init();
