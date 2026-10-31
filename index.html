@@ -3120,41 +3120,36 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 }
 
                 try {
-                    // Ищем профиль в общей базе, а не сравниваем ID с локальным профилем браузера.
+                    // Ищем игрока по текстовому player_id (вида PNT-...)
                     const { data: player, error: selectError } = await supabaseClient
                         .from('profiles')
-                        .select('user_id, balance, usd_balance')
-                        .eq('user_id', targetId)
+                        .select('id, player_id, balance, usd_balance')
+                        .eq('player_id', targetId)
                         .maybeSingle();
 
                     if (selectError) throw selectError;
                     if (!player) {
-                        this.showToast('Игрок с таким ID не найден в Supabase.', 'error');
+                        this.showToast('Игрок с таким ID не найден в базе Supabase.', 'error');
                         return;
                     }
 
                     const isUsd = type === 'usd';
                     const balanceColumn = isUsd ? 'usd_balance' : 'balance';
                     const newBalance = Number(player[balanceColumn] || 0) + amount;
-                    const { data: updatedRows, error: updateError } = await supabaseClient
+
+                    const { error: updateError } = await supabaseClient
                         .from('profiles')
                         .update({ [balanceColumn]: newBalance })
-                        .eq('user_id', targetId)
-                        .select('user_id');
+                        .eq('id', player.id);
 
                     if (updateError) throw updateError;
-                    if (!updatedRows || updatedRows.length === 0) {
-                        this.showToast('Баланс не обновлён. Проверьте права доступа к профилям в Supabase.', 'error');
-                        return;
-                    }
 
-                    this.showToast(`Начислено ${amount.toLocaleString()} ${isUsd ? '$' : '₽'} игроку ${targetId}.`, 'success');
+                    this.showToast(`Успешно! Начислено ${amount.toLocaleString()} ${isUsd ? '$' : '₽'} игроку ${targetId}.`, 'success');
                 } catch (error) {
                     console.error('Ошибка выдачи валюты через Supabase:', error);
-                    this.showToast('Не удалось выдать валюту через Supabase. Проверьте консоль и политики RLS.', 'error');
+                    this.showToast('Не удалось выдать валюту. Проверьте консоль.', 'error');
                 }
             }
-
             adminGrantNumberById() {
                 const targetId = (document.getElementById('admin-target-user-id')?.value || '').trim().toUpperCase();
                 if (!targetId || targetId !== String(this.state.profile.userId || '').toUpperCase()) {
