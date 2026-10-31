@@ -1754,14 +1754,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
             startCloudAutoSyncTimer() {
                 if (this.cloudSyncTimer) clearInterval(this.cloudSyncTimer);
-                // Автосохранение прогресса в Supabase каждые 3 минуты для вошедшего игрока.
+                // Автосохранение прогресса в Supabase каждую 1 минуту для вошедшего игрока.
                 this.cloudSyncTimer = setInterval(() => {
                     const cloudUserId = this.state.cloudUser?.id;
                     if (!cloudUserId) return;
                     this.saveUserDataToCloud(cloudUserId)
-                        .then(() => console.log('Автосохранение в облако выполнено успешно.'))
+                        .then(() => console.log('Автосохранение выполнено успешно.'))
                         .catch(error => console.error('Ошибка автосохранения в облако:', error));
-                }, 3 * 60 * 1000);
+                }, 60 * 1000);
             }
 
             renderCloudUI() {
