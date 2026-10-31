@@ -1799,17 +1799,21 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
             async loadUserData(userId) {
                 if (!supabaseClient || !userId) return false;
+
+                // Ищем по колонке id, а не user_id
                 const { data: profile, error: profileError } = await supabaseClient
-                    .from('profiles').select('*').eq('user_id', userId).maybeSingle();
+                    .from('profiles').select('*').eq('id', userId).maybeSingle();
+
                 if (profileError) throw profileError;
                 if (profile) {
                     this.state.balance = Number(profile.balance || 0);
                     this.state.usdBalance = Number(profile.usd_balance || 0);
-                    if (profile.player_id) this.state.profile.userId = profile.player_id;
                     if (profile.nickname) this.state.profile.nickname = profile.nickname;
                 }
+
                 const { data: items, error: itemsError } = await supabaseClient
                     .from('user_items').select('*').eq('user_id', userId);
+
                 if (itemsError) throw itemsError;
                 if (Array.isArray(items)) {
                     this.state.collection = items.map(item => ({
