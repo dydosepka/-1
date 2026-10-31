@@ -1601,6 +1601,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (!supabaseClient || !userId) throw new Error('Сначала войдите в аккаунт.');
                 const profileRow = {
                     id: userId,
+                    player_id: this.state.profile.userId, // передаем строковый ID вида PNT-...
                     balance: Number(this.state.balance || 0),
                     usd_balance: Number(this.state.usdBalance || 0),
                     nickname: this.state.profile?.nickname || null
