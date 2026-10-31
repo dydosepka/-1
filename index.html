@@ -1300,6 +1300,12 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                         this.state.preferences = { ...{theme:'dark',sound:true,haptics:true}, ...(parsed.preferences || {}) };
                         this.state.autoSell = { ...{rarities:{common:false,uncommon:false,rare:false,epic:false,legendary:false,mythic:false,ultra:false},threshold:0}, ...(parsed.autoSell || {}) };
                         this.state.autoSell.rarities = {common:false,uncommon:false,rare:false,epic:false,legendary:false,mythic:false,ultra:false, ...(parsed.autoSell?.rarities || {})}; 
+                        this.state.collection = (Array.isArray(this.state.collection) ? this.state.collection : []).map(item => this.normalizeCollectionItem(item));
+                        const favIds = new Set((Array.isArray(this.state.favorites) ? this.state.favorites : []).map(f => typeof f === 'string' ? f : f?.id).filter(Boolean));
+                        this.state.collection.forEach(item => { if (item.isFavorite) favIds.add(item.id); });
+                        this.state.favorites = this.state.collection.filter(item => favIds.has(item.id));
+                        this.state.favorites.forEach(item => { item.isFavorite = true; });
+                        this.state.tonBalance = Number(this.state.tonBalance || 0);
                     } catch (e) {}
                 }
                 if (!this.state.profile) this.state.profile = { nickname: 'Тайкун Игрок', bio: '', dob: '', regDate: new Date().toLocaleDateString('ru-RU'), selectedNumberId: null };
@@ -1326,6 +1332,44 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
             saveState() {
                 localStorage.setItem('pnt_save_v2', JSON.stringify(this.state));
+            }
+
+            normalizeCollectionItem(raw = {}) {
+                const rarityKey = raw.rarityKey || raw.rarity_key || (typeof raw.rarity === 'string' ? raw.rarity : raw.rarity?.id) || 'common';
+                const rarity = RARITIES[rarityKey] || RARITIES.common;
+                const plan = raw.plan && typeof raw.plan === 'object' ? raw.plan : {
+                    country: raw.auctionLotId ? 'TON Auction' : 'Неизвестно',
+                    code: raw.auctionLotId ? 'TON' : '', flag: raw.flag || '🇷🇺',
+                    pattern: raw.formattedNumber || raw.formatted_number || '', formatDigits: 0
+                };
+                return {
+                    ...raw,
+                    id: String(raw.id || `item_${Date.now()}_${Math.random().toString(36).slice(2,8)}`),
+                    formattedNumber: raw.formattedNumber || raw.formatted_number || '',
+                    flag: raw.flag || plan.flag || '🇷🇺',
+                    rarityKey, rarity,
+                    price: Number(raw.price || 0),
+                    currency: raw.currency || (raw.auctionLotId ? 'ton' : (rarityKey === 'secret' ? 'usd' : 'rub')),
+                    plan,
+                    patternDesc: raw.patternDesc || raw.pattern_desc || '',
+                    isFavorite: !!(raw.isFavorite ?? raw.is_favorite),
+                    _selectedMain: !!raw.selectedMain
+                };
+            }
+
+            encodeCloudItemMeta(item) {
+                const meta = {
+                    currency: item.currency || 'rub', auctionLotId: item.auctionLotId || null,
+                    plan: item.plan || null, selectedMain: this.state.profile?.selectedNumberId === item.id
+                };
+                return `${item.patternDesc || ''}\n[[PNT_META:${encodeURIComponent(JSON.stringify(meta))}]]`;
+            }
+
+            decodeCloudItemMeta(description = '') {
+                const match = String(description).match(/\n?\[\[PNT_META:([\s\S]*?)\]\]$/);
+                if (!match) return { patternDesc: description || '', meta: {} };
+                try { return { patternDesc: String(description).slice(0, match.index).trimEnd(), meta: JSON.parse(decodeURIComponent(match[1])) }; }
+                catch (_) { return { patternDesc: description || '', meta: {} }; }
             }
 
             showToast(message, type = 'info') {
@@ -1625,6 +1669,23 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             }
 
             async saveUserDataToCloud(userId) {
+                if (this._cloudSavePromise) {
+                    this._cloudSaveQueued = true;
+                    return this._cloudSavePromise;
+                }
+                this._cloudSavePromise = this._saveUserDataToCloudOnce(userId);
+                try {
+                    return await this._cloudSavePromise;
+                } finally {
+                    this._cloudSavePromise = null;
+                    if (this._cloudSaveQueued) {
+                        this._cloudSaveQueued = false;
+                        Promise.resolve().then(() => this.saveUserDataToCloud(userId)).catch(err => console.error('Повторное облачное сохранение не удалось:', err));
+                    }
+                }
+            }
+
+            async _saveUserDataToCloudOnce(userId) {
                 if (!supabaseClient || !userId) throw new Error('Сначала войдите в аккаунт.');
                 const profileRow = {
                     id: userId,
@@ -1649,7 +1710,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     flag: item.flag || '🇷🇺',
                     rarity_key: item.rarityKey || item.rarity_key || item.rarity || 'common',
                     price: Number(item.price || 0),
-                    pattern_desc: item.patternDesc || item.pattern_desc || '',
+                    pattern_desc: this.encodeCloudItemMeta(item),
                     is_favorite: !!item.isFavorite
                 }));
                 if (items.length) {
@@ -1670,17 +1731,18 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     this.state.tonBalance = Number(profile.ton_balance || 0);
                     if (profile.nickname) this.state.profile.nickname = profile.nickname;
                 }
-                this.state.collection = (items || []).map(item => ({
-                    id: item.id,
-                    formattedNumber: item.formatted_number || item.formattedNumber || '',
-                    flag: item.flag || '🇷🇺',
-                    rarityKey: item.rarity_key || item.rarityKey || 'common',
-                    rarity: item.rarity_key || item.rarity || 'common',
-                    price: Number(item.price || 0),
-                    patternDesc: item.pattern_desc || item.patternDesc || '',
-                    isFavorite: !!item.is_favorite
-                }));
-                this.state.favorites = this.state.collection.filter(x => x.isFavorite).map(x => x.id);
+                this.state.collection = (items || []).map(row => {
+                    const decoded = this.decodeCloudItemMeta(row.pattern_desc || row.patternDesc || '');
+                    return this.normalizeCollectionItem({
+                        id: row.id, formattedNumber: row.formatted_number || row.formattedNumber || '',
+                        flag: row.flag || '🇷🇺', rarityKey: row.rarity_key || 'common',
+                        price: Number(row.price || 0), patternDesc: decoded.patternDesc,
+                        isFavorite: !!row.is_favorite, ...decoded.meta
+                    });
+                });
+                this.state.favorites = this.state.collection.filter(x => x.isFavorite);
+                const selectedCloudItem = this.state.collection.find(x => x._selectedMain);
+                this.state.profile.selectedNumberId = selectedCloudItem?.id || null;
                 this.saveState();
                 this.updateUIHeader();
                 this.renderProfileUI();
@@ -1984,16 +2046,18 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
                 if (itemsError) throw itemsError;
                 if (Array.isArray(items)) {
-                    this.state.collection = items.map(item => ({
-                        id: item.id,
-                        formattedNumber: item.formatted_number || item.formattedNumber || '',
-                        flag: item.flag || '🇷🇺',
-                        rarityKey: item.rarity_key || item.rarityKey || 'common',
-                        rarity: item.rarity_key || item.rarity || 'common',
-                        price: Number(item.price || 0),
-                        patternDesc: item.pattern_desc || item.patternDesc || '',
-                        isFavorite: !!item.is_favorite
-                    }));
+                    this.state.collection = items.map(row => {
+                        const decoded = this.decodeCloudItemMeta(row.pattern_desc || row.patternDesc || '');
+                        return this.normalizeCollectionItem({
+                            id: row.id, formattedNumber: row.formatted_number || row.formattedNumber || '',
+                            flag: row.flag || '🇷🇺', rarityKey: row.rarity_key || 'common',
+                            price: Number(row.price || 0), patternDesc: decoded.patternDesc,
+                            isFavorite: !!row.is_favorite, ...decoded.meta
+                        });
+                    });
+                    this.state.favorites = this.state.collection.filter(x => x.isFavorite);
+                    const selectedCloudItem = this.state.collection.find(x => x._selectedMain);
+                    this.state.profile.selectedNumberId = selectedCloudItem?.id || null;
                 }
                 this.saveState();
                 this.updateUIHeader();
@@ -2119,10 +2183,11 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (!displayEl || !rarityEl || !bgEl) return;
 
                 const selectedId = this.state.profile.selectedNumberId;
-                let activeNum = this.state.favorites.find(f => f.id === selectedId);
+                let activeNum = this.state.collection.find(f => f.id === selectedId && f.isFavorite);
 
-                if (!activeNum && this.state.favorites.length > 0) {
-                    activeNum = this.state.favorites[0];
+                const favoriteItems = this.state.collection.filter(item => item.isFavorite);
+                if (!activeNum && favoriteItems.length > 0) {
+                    activeNum = favoriteItems[0];
                     this.state.profile.selectedNumberId = activeNum.id;
                     this.saveState();
                 }
@@ -2166,7 +2231,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 const list = document.getElementById('profile-num-options-list');
                 if (!modal || !list) return;
 
-                const favorites = this.state.favorites;
+                const favorites = this.state.collection.filter(item => item.isFavorite);
                 if (favorites.length === 0) {
                     list.innerHTML = `<p class="text-xs text-rose-400 py-4 text-center">Ваше "Избранное" пусто. Сначала выбейте номер и добавьте его в избранное!</p>`;
                 } else {
@@ -2504,7 +2569,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (idx !== -1) {
                     const item = this.state.collection[idx];
                     this.state.collection.splice(idx, 1);
-                    this.state.favorites = this.state.favorites.filter(f => f.id !== id);
+                    this.state.favorites = this.state.favorites.filter(f => (typeof f === 'string' ? f : f?.id) !== id);
                     if (item.rarityKey === 'secret' && item.plan && !this.state.eventSecretSold.includes(item.plan.code)) this.state.eventSecretSold.push(item.plan.code);
 
                     if (this.state.profile.selectedNumberId === id) {
@@ -2525,11 +2590,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     this.renderMarket();
                     this.renderFavorites();
                     this.renderEventUI();
+                    if (this.state.cloudUser?.id) this.saveUserDataToCloud(this.state.cloudUser.id).catch(err => console.error('Ошибка облачного сохранения продажи:', err));
                     this.showToast(item.currency === 'ton' ? `Номер продан за ${item.price} TON` : (item.rarityKey === 'secret' ? `Секретный номер продан за ${item.price} $` : `Продано за ${item.price.toLocaleString()} ₽`), 'success');
                 }
             }
 
             executeBulkSell() {
+                this.selectedMarketIds = new Set([...this.selectedMarketIds].filter(id => this.state.collection.some(item => item.id === id && !item.isFavorite)));
+                if (this.selectedMarketIds.size === 0) { this.showToast('Нет выбранных предметов для продажи.', 'error'); return; }
                 let earned = 0;
                 let earnedUsd = 0;
                 let earnedTon = 0;
@@ -2556,7 +2624,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 this.state.balance += earned;
                 this.state.usdBalance = (this.state.usdBalance || 0) + earnedUsd;
                 this.state.tonBalance = (this.state.tonBalance || 0) + earnedTon;
-                this.state.favorites = this.state.favorites.filter(item => !soldIds.has(item.id));
+                this.state.favorites = this.state.favorites.filter(item => !soldIds.has(typeof item === 'string' ? item : item?.id));
 
                 this.state.quests.sellCount = Math.min(100, this.state.quests.sellCount + soldAmount);
                 this.state.quests.salesEarnings = Math.min(5000000, this.state.quests.salesEarnings + earned);
@@ -2568,6 +2636,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 this.renderMarket();
                 this.renderFavorites();
                 this.renderEventUI();
+                if (this.state.cloudUser?.id) this.saveUserDataToCloud(this.state.cloudUser.id).catch(err => console.error('Ошибка облачного сохранения массовой продажи:', err));
                 this.showToast(`Продано на сумму ${earned.toLocaleString()} ₽, ${earnedUsd} $ и ${earnedTon} TON`, 'success');
             }
 
@@ -2764,10 +2833,10 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (!item) return;
 
                 const maxFavCap = this.state.upgrades.maxFavCapacity || 3;
-                const isFav = this.state.favorites.some(f => f.id === id);
+                const isFav = this.state.favorites.some(f => (typeof f === 'string' ? f : f?.id) === id);
 
                 if (isFav) {
-                    this.state.favorites = this.state.favorites.filter(f => f.id !== id);
+                    this.state.favorites = this.state.favorites.filter(f => (typeof f === 'string' ? f : f?.id) !== id);
                     item.isFavorite = false;
                     if (this.state.profile.selectedNumberId === id) {
                         this.state.profile.selectedNumberId = null;
@@ -2795,6 +2864,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 this.renderCollection();
                 this.renderMarket();
                 this.renderFavorites();
+                if (this.state.cloudUser?.id) this.saveUserDataToCloud(this.state.cloudUser.id).catch(err => console.error('Ошибка сохранения избранного:', err));
             }
 
             renderCollection() {
@@ -2803,7 +2873,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
                 let totalVal = 0;
                 this.state.collection.forEach(i => totalVal += i.price);
-                document.getElementById('collection-total-value').textContent = totalVal.toLocaleString() + ' ₽';
+                document.getElementById('collection-total-value').textContent = totalVal.toLocaleString() + ' (номинал)';
 
                 if (this.state.collection.length === 0) {
                     grid.innerHTML = `<div class="col-span-2 text-center py-12 text-slate-500 text-xs">Коллекция пуста. Нажимайте на генератор, чтобы выбить номера!</div>`;
@@ -2860,7 +2930,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (!grid) return;
                 const lots = this.getAuctionLots();
                 grid.innerHTML = lots.map(lot => {
-                    const owned = (this.state.collection || []).some(item => item.auctionLotId === lot.id);
+                    const owned = false;
                     const rarity = RARITIES[lot.rarityKey];
                     return `<div class="glass-card p-4 rounded-2xl border border-slate-800 space-y-3">
                         <div class="flex items-center justify-between"><span class="text-[10px] font-black uppercase tracking-wider" style="color:${rarity.color}">${lot.tier}</span><span class="text-[10px] text-slate-500">TON AUCTION</span></div>
@@ -2873,9 +2943,6 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             buyAuctionLot(lotId) {
                 const lot = this.getAuctionLots().find(x => x.id === lotId);
                 if (!lot) return;
-                if ((this.state.collection || []).some(item => item.auctionLotId === lot.id)) {
-                    this.showToast('Этот номер уже куплен.', 'error'); return;
-                }
                 const balance = Number(this.state.tonBalance || 0);
                 if (balance < lot.price) { this.showToast('Недостаточно TON для покупки.', 'error'); return; }
                 const item = {
@@ -2887,7 +2954,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 };
                 this.state.tonBalance = balance - lot.price;
                 this.state.collection.unshift(item);
-                this.saveState(); this.updateUIHeader(); this.renderAuctionUI(); this.renderCollection();
+                this.saveState(); this.updateUIHeader(); this.renderAuctionUI(); this.renderCollection(); this.renderMarket(); this.renderFavorites(); this.renderProfileUI();
                 if (this.state.cloudUser?.id) this.saveUserDataToCloud(this.state.cloudUser.id).catch(err => console.error('Ошибка облачного сохранения покупки:', err));
                 this.showToast('Номер успешно куплен за ' + lot.price + ' TON!', 'success');
             }
@@ -2899,7 +2966,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 const searchVal = (document.getElementById('market-search')?.value || '').toLowerCase();
                 const sortVal = document.getElementById('market-sort')?.value || 'price-desc';
 
-                let items = this.state.collection.filter(i => !this.state.favorites.some(f => f.id === i.id));
+                let items = this.state.collection.filter(i => !this.state.favorites.some(f => (typeof f === 'string' ? f : f?.id) === i.id));
 
                 if (searchVal) {
                     items = items.filter(i => i.formattedNumber.toLowerCase().includes(searchVal) || i.plan.country.toLowerCase().includes(searchVal));
@@ -2907,7 +2974,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
                 if (sortVal === 'price-desc') items.sort((a, b) => b.price - a.price);
                 if (sortVal === 'price-asc') items.sort((a, b) => a.price - b.price);
-                if (sortVal === 'rarity-desc') items.sort((a, b) => b.rarity.rank - a.rarity.rank);
+                if (sortVal === 'rarity-desc') items.sort((a, b) => (b.rarity?.rank || 0) - (a.rarity?.rank || 0));
 
                 if (items.length === 0) {
                     grid.innerHTML = `<div class="col-span-2 text-center py-12 text-slate-500 text-xs">Нет номеров на Маркете.</div>`;
@@ -2953,7 +3020,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             }
 
             selectAllMarket() {
-                this.state.collection.filter(i => !this.state.favorites.some(f => f.id === i.id)).forEach(i => this.selectedMarketIds.add(i.id));
+                this.state.collection.filter(i => !i.isFavorite).forEach(i => this.selectedMarketIds.add(i.id));
                 this.renderMarket();
             }
 
@@ -2971,7 +3038,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     return;
                 }
 
-                grid.innerHTML = this.state.favorites.map(item => `
+                grid.innerHTML = this.state.collection.filter(item => item.isFavorite).map(item => `
                     <div class="glass-card p-3 rounded-xl border border-slate-800 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${item.rarityKey === 'secret' ? 'secret-rarity-bg' : item.rarity.pillBg}">
