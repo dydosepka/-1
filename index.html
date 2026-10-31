@@ -3124,7 +3124,12 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 this.state.quests.sellCount = Math.min(100, this.state.quests.sellCount + 1);
                 this.state.quests.salesEarnings = Math.min(5000000, this.state.quests.salesEarnings + (item.currency === 'usd' ? 0 : item.price));
                 this.saveState(); this.updateUIHeader(); this.renderCollection(); this.renderMarket();
-                this.showToast(`Авто-продажа: +${Number(item.price).toLocaleString()} ₽`, 'success');
+                // Для обычных, необычных и редких предметов не показываем всплывающее уведомление.
+                // Сама автопродажа, начисление валюты и сохранение продолжают работать.
+                if (!['common', 'uncommon', 'rare'].includes(item.rarityKey)) {
+                    const currencyLabel = item.currency === 'ton' ? 'TON' : (item.currency === 'usd' ? '$' : '₽');
+                    this.showToast(`Авто-продажа: +${Number(item.price).toLocaleString()} ${currencyLabel}`, 'success');
+                }
                 return true;
             }
 
