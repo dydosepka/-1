@@ -709,7 +709,6 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     <span id="quests-total-progress" class="font-mono text-xs font-black text-amber-400 glass-panel px-2.5 py-1 rounded-lg">0 / 3</span>
                 </div>
 
-                <button id="btn-claim-daily-gifts" onclick="app.claimDailyGifts()" disabled class="w-full py-2.5 px-3 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-extrabold text-xs transition disabled:opacity-40 flex items-center justify-center gap-2"><i class="fa-solid fa-gift"></i><span>Забрать 2 подарка</span></button>
                 <div id="grand-bonus-actions" class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
                     <button id="btn-claim-bonus-rub" onclick="app.claimGrandBonus('rub')" disabled class="py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition disabled:opacity-40 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20">
                         <i class="fa-solid fa-coins"></i>
@@ -3066,11 +3065,6 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     btnUsd.innerHTML = usdClaimed
                         ? '<i class="fa-solid fa-check"></i><span>Доллары получены</span>'
                         : '<i class="fa-solid fa-dollar-sign"></i><span>+100 $</span>';
-                }
-                const giftBtn = document.getElementById('btn-claim-daily-gifts');
-                if (giftBtn) {
-                    giftBtn.disabled = !allDone || !!this.state.quests.dailyGiftClaimed || this.state.collection.length + 2 > (this.state.upgrades.maxCapacity || 50);
-                    giftBtn.textContent = this.state.quests.dailyGiftClaimed ? 'Подарки получены' : 'Забрать 2 подарка';
                 }
                 const timerEl = document.getElementById('daily-quests-reset-timer');
                 if (timerEl) {
