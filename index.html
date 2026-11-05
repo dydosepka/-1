@@ -80,6 +80,62 @@
         @keyframes secretRainbow { 0% { background-position: 0% 50%; filter: hue-rotate(0deg); } 50% { background-position: 100% 50%; filter: hue-rotate(180deg); } 100% { background-position: 0% 50%; filter: hue-rotate(360deg); } }
         .secret-rarity { background: linear-gradient(90deg, #ff3b3b, #ffb13b, #fff33b, #42ff70, #38d9ff, #8b5cff, #ff4fd8, #ff3b3b); background-size: 300% 300%; animation: secretRainbow 4s linear infinite; color: #fff !important; -webkit-background-clip: text; background-clip: text; text-shadow: 0 0 10px rgba(255,255,255,.18); }
         .secret-rarity-bg { background: linear-gradient(120deg, #ff3b3b, #ffb13b, #fff33b, #42ff70, #38d9ff, #8b5cff, #ff4fd8); background-size: 300% 300%; animation: secretRainbow 4s linear infinite; }
+
+        /* ===== SIM CARD ===== */
+        .sim-card {
+            --sim-accent: #64748b;
+            position: relative; width: 100%; max-width: 340px; aspect-ratio: 1.6 / 1;
+            container-type: inline-size;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 6% 7% 5.5%; border-radius: 18px; overflow: hidden;
+            background: radial-gradient(120% 90% at 18% 0%, #2a2a2e 0%, #131315 55%, #08080a 100%);
+            border: 1px solid color-mix(in srgb, var(--sim-accent) 38%, rgba(255,255,255,.06));
+            box-shadow: 0 18px 40px -14px rgba(0,0,0,.85), 0 0 38px -12px var(--sim-accent), inset 0 1px 0 rgba(255,255,255,.09);
+            transition: box-shadow .3s ease, transform .2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .sim-card:active { transform: scale(.985); }
+        .sim-card::after {
+            content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+            background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,.055) 50%, transparent 62%);
+        }
+        .sim-top { display: flex; justify-content: flex-end; }
+        .sim-slot {
+            width: 27%; aspect-ratio: 1.28 / 1; display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,.035);
+            clip-path: polygon(0 0, 76% 0, 100% 24%, 100% 100%, 0 100%);
+            border-radius: 9px;
+        }
+        .sim-chip {
+            position: relative; width: 60%; aspect-ratio: 1 / 1; border-radius: 22%;
+            background: linear-gradient(135deg, #f3d98b 0%, #c9a24a 45%, #e8c86e 100%);
+            box-shadow: 0 0 0 2px #0b0b0d, 0 2px 6px rgba(0,0,0,.6);
+        }
+        .sim-chip::before {
+            content: ''; position: absolute; left: 0; right: 0; top: 33%; height: 34%;
+            border-top: 1.5px solid rgba(60,40,0,.55); border-bottom: 1.5px solid rgba(60,40,0,.55);
+        }
+        .sim-chip::after {
+            content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 36%; transform: translateX(-50%);
+            border-left: 1.5px solid rgba(60,40,0,.55); border-right: 1.5px solid rgba(60,40,0,.55);
+            border-radius: 30%;
+        }
+        .sim-number {
+            position: relative; z-index: 1; display: block; min-height: 1.3em; text-align: left;
+            font-weight: 600; font-size: clamp(15px, 5.4vw, 24px); font-size: 7cqw;
+            letter-spacing: .01em; white-space: nowrap; font-variant-numeric: tabular-nums;
+            color: #c9c9cf; text-shadow: 0 1px 0 rgba(0,0,0,.7);
+        }
+        .sim-empty .sim-number { color: #6b6b73; font-weight: 500; }
+        .sim-bottom { position: relative; z-index: 1; display: flex; justify-content: flex-end; min-height: 1.1em; }
+        .sim-rarity { font-size: 3.6cqw; font-size: clamp(10px, 3.6cqw, 13px); letter-spacing: .04em; color: var(--sim-accent); opacity: .95; }
+        .sim-secret::before {
+            content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 2;
+            background: linear-gradient(120deg, #ff3b3b, #ffb13b, #fff33b, #42ff70, #38d9ff, #8b5cff, #ff4fd8);
+            background-size: 300% 300%; animation: secretRainbow 4s linear infinite;
+            -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude;
+        }
     </style>
 
 <style id="disable-screen-zoom">
@@ -187,10 +243,10 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
                     <!-- PHONE NUMBER PILL BOX -->
                     <div id="drop-plate-box" class="w-full flex flex-col items-center justify-center p-4">
-                        <div id="phone-pill-bg" class="w-full max-w-sm py-4.5 px-6 rounded-[28px] bg-[#38a3b8] shadow-2xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center border border-white/20 min-h-[72px]">
-                            <span id="drop-number-display" class="font-sans font-black text-2xl sm:text-3xl text-white tracking-wide text-center drop-shadow-md min-h-[36px] flex items-center justify-center">
-                                +888 0530 1427
-                            </span>
+                        <div id="phone-pill-bg" class="sim-card">
+                            <div class="sim-top"><div class="sim-slot"><div class="sim-chip"></div></div></div>
+                            <span id="drop-number-display" class="sim-number">+888 0530 1427</span>
+                            <div class="sim-bottom"><span id="drop-sim-rarity" class="sim-rarity">Экзотический (+888)</span></div>
                         </div>
 
                         <!-- SUBTITLE / PATTERN MATCH NOTE -->
@@ -349,14 +405,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     </button>
                 </div>
 
-                <div id="profile-number-card-bg" class="w-full py-5 px-6 rounded-2xl bg-slate-800/80 shadow-2xl flex flex-col items-center justify-center border border-white/10 min-h-[90px] transition-all">
-                    <span id="profile-number-display" class="font-sans font-black text-2xl sm:text-3xl text-white tracking-wide text-center drop-shadow-md">
-                        Номер не установлен
-                    </span>
-                    <span id="profile-number-rarity" class="text-[10px] uppercase font-bold text-slate-400 mt-1">
-                        Выберите номер из Избранного
-                    </span>
+                <div id="profile-number-card-bg" class="sim-card sim-empty">
+                    <div class="sim-top"><div class="sim-slot"><div class="sim-chip"></div></div></div>
+                    <span id="profile-number-display" class="sim-number">Номер не установлен</span>
+                    <div class="sim-bottom"><span id="profile-sim-rarity" class="sim-rarity"></span></div>
                 </div>
+                <span id="profile-number-rarity" class="text-[10px] uppercase font-bold text-slate-400 mt-3 text-center">
+                    Выберите номер из Избранного
+                </span>
             </div>
 
             <!-- UNIQUE LOCAL PLAYER ID -->
@@ -2271,15 +2327,18 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 }
 
                 if (activeNum) {
-                    displayEl.textContent = `${activeNum.flag} ${activeNum.formattedNumber}`;
-                    rarityEl.textContent = `${activeNum.rarity.name} • ${activeNum.patternDesc}`;
-                    rarityEl.style.color = activeNum.rarity.color;
-                    bgEl.className = `w-full py-5 px-6 rounded-2xl shadow-2xl flex flex-col items-center justify-center border border-white/20 transition-all ${activeNum.rarity.pillBg}`;
+                    displayEl.textContent = activeNum.formattedNumber;
+                    rarityEl.textContent = `${activeNum.flag} ${activeNum.rarity.name} • ${activeNum.patternDesc}`;
+                    rarityEl.style.color = activeNum.rarityKey === 'secret' ? '#e879f9' : activeNum.rarity.color;
+                    this.applySimStyle(bgEl, activeNum, document.getElementById('profile-sim-rarity'));
                 } else {
                     displayEl.textContent = 'Номер не выбран';
                     rarityEl.textContent = 'Добавьте номер в Избранное и выберите его здесь';
                     rarityEl.style.color = '#94a3b8';
-                    bgEl.className = 'w-full py-5 px-6 rounded-2xl bg-slate-800/80 shadow-2xl flex flex-col items-center justify-center border border-white/10 transition-all';
+                    bgEl.className = 'sim-card sim-empty';
+                    bgEl.style.setProperty('--sim-accent', '#475569');
+                    const simLbl = document.getElementById('profile-sim-rarity');
+                    if (simLbl) { simLbl.textContent = ''; simLbl.classList.remove('secret-rarity'); }
                 }
             }
 
@@ -2427,6 +2486,18 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 }
             }
 
+            applySimStyle(el, item, labelEl) {
+                if (!el || !item) return;
+                const secret = item.rarityKey === 'secret';
+                el.className = 'sim-card' + (secret ? ' sim-secret' : '');
+                el.style.setProperty('--sim-accent', secret ? '#e879f9' : item.rarity.color);
+                if (labelEl) {
+                    labelEl.textContent = item.rarity.name;
+                    labelEl.classList.toggle('secret-rarity', secret);
+                    labelEl.style.color = secret ? '' : item.rarity.color;
+                }
+            }
+
             renderInstantDrop(item) {
                 document.getElementById('prompt-tap-here').classList.add('hidden');
                 const card = document.getElementById('drop-result-card');
@@ -2446,7 +2517,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 document.getElementById('drop-country-flag').textContent = item.flag;
 
                 const pillBg = document.getElementById('phone-pill-bg');
-                pillBg.className = `w-full max-w-sm py-4.5 px-6 rounded-[28px] shadow-2xl flex items-center justify-center border border-white/20 ${item.rarityKey === 'secret' ? 'secret-rarity-bg' : item.rarity.pillBg}`;
+                this.applySimStyle(pillBg, item, document.getElementById('drop-sim-rarity'));
 
                 const dotsContainer = document.getElementById('drop-rarity-dots');
                 dotsContainer.innerHTML = Array(item.rarity.dots).fill(0).map(() => 
@@ -2473,7 +2544,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 document.getElementById('drop-country-flag').textContent = item.flag;
                 document.getElementById('drop-pattern-desc').textContent = 'Анализ комбинации...';
                 const pillBg = document.getElementById('phone-pill-bg');
-                pillBg.className = `w-full max-w-sm py-4.5 px-6 rounded-[28px] shadow-2xl transition-all duration-300 flex items-center justify-center border border-white/20 ${item.rarityKey === 'secret' ? 'secret-rarity-bg' : item.rarity.pillBg}`;
+                this.applySimStyle(pillBg, item, document.getElementById('drop-sim-rarity'));
                 document.getElementById('drop-rarity-dots').innerHTML = Array(item.rarity.dots).fill(0).map(() => `<div class="w-2 h-2 rounded-full" style="background-color:${item.rarity.color}"></div>`).join('');
                 document.getElementById('drop-bg-glow').style.background = item.rarity.color;
                 const numberDisplay = document.getElementById('drop-number-display');
