@@ -541,7 +541,10 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
                     <input type="text" id="market-search" inputmode="numeric" oninput="app.renderMarket()" placeholder="Найти по цифрам" class="w-full bg-white/[0.04] border border-white/10 text-sm pl-9 pr-3 py-3 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-white/30">
                 </div>
-                <button id="market-select-toggle" onclick="app.toggleMarketSelectMode()" class="px-5 rounded-2xl bg-white/[0.06] border border-white/10 text-sm font-extrabold text-white">Выбрать</button>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button id="market-select-all-top" onclick="app.selectAllMarket()" class="hidden px-3 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-xs font-extrabold text-white whitespace-nowrap">Выбрать все</button>
+                    <button id="market-select-toggle" onclick="app.toggleMarketSelectMode()" class="px-5 rounded-2xl bg-white/[0.06] border border-white/10 text-sm font-extrabold text-white whitespace-nowrap">Выбрать</button>
+                </div>
             </div>
 
             <div id="market-rarity-chips" class="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4" style="scrollbar-width:none"></div>
@@ -565,7 +568,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 <div class="flex items-center gap-2">
                     <button onclick="app.selectAllMarket()" class="px-3 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-xs font-bold">Все</button>
                     <button onclick="app.deselectAllMarket()" class="px-3 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-400">Снять</button>
-                    <button id="btn-market-sell-selected" onclick="app.executeBulkSell()" disabled class="flex-1 py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-sm disabled:opacity-40 transition">Продать выбранные</button>
+                    <button id="btn-market-sell-selected" onclick="app.executeBulkSell()" class="hidden flex-1 py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-sm transition">Продать</button>
                 </div>
             </div>
 
@@ -3404,8 +3407,10 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 const selBtn = document.getElementById('market-select-toggle');
                 if (selBtn) {
                     selBtn.textContent = F.selectMode ? 'Готово' : 'Выбрать';
-                    selBtn.className = `px-5 rounded-2xl border text-sm font-extrabold ${F.selectMode ? 'bg-purple-600 border-purple-500 text-white' : 'bg-white/[0.06] border-white/10 text-white'}`;
+                    selBtn.className = `px-5 py-3 rounded-2xl border text-sm font-extrabold ${F.selectMode ? 'bg-purple-600 border-purple-500 text-white' : 'bg-white/[0.06] border-white/10 text-white'}`;
                 }
+                const selectAllTop = document.getElementById('market-select-all-top');
+                if (selectAllTop) selectAllTop.classList.toggle('hidden', !F.selectMode);
 
                 // --- фильтрация
                 const digits = (document.getElementById('market-search')?.value || '').replace(/\D/g, '');
@@ -3454,11 +3459,12 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 }
 
                 const bar = document.getElementById('market-bulk-bar');
-                if (bar) bar.classList.toggle('hidden', !F.selectMode);
+                if (bar) bar.classList.toggle('hidden', !F.selectMode || this.selectedMarketIds.size === 0);
                 const sellBtn = document.getElementById('btn-market-sell-selected');
                 if (sellBtn) {
-                    sellBtn.disabled = this.selectedMarketIds.size === 0;
-                    sellBtn.textContent = this.selectedMarketIds.size > 0 ? `Продать выбранные (${this.selectedMarketIds.size})` : 'Продать выбранные';
+                    const hasSelection = this.selectedMarketIds.size > 0;
+                    sellBtn.classList.toggle('hidden', !hasSelection);
+                    sellBtn.textContent = hasSelection ? `Продать (${this.selectedMarketIds.size})` : 'Продать';
                 }
             }
 
@@ -3467,9 +3473,33 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             showMoreMarket() { this.getMarketFilters().limit += 60; this.renderMarket(); }
             toggleMarketSelectMode() {
                 const F = this.getMarketFilters();
-                F.selectMode = !F.selectMode;
-                if (!F.selectMode) this.selectedMarketIds.clear();
+                if (F.selectMode) {
+                    // Legacy button behavior: finish and sell the selected numbers.
+                    this.finishMarketSelection();
+                    return;
+                }
+                F.selectMode = true;
+                this.selectedMarketIds.clear();
                 this.renderMarket();
+            }
+
+            finishMarketSelection() {
+                const F = this.getMarketFilters();
+                const selected = [...this.selectedMarketIds].filter(id =>
+                    this.state.collection.some(item => item.id === id && !item.isFavorite)
+                );
+
+                // Exit selection mode before sale so the market returns to its normal state.
+                F.selectMode = false;
+                if (!selected.length) {
+                    this.selectedMarketIds.clear();
+                    this.renderMarket();
+                    this.showToast('Сначала выберите номера для продажи.', 'info');
+                    return;
+                }
+
+                this.selectedMarketIds = new Set(selected);
+                this.executeBulkSell();
             }
 
             openMarketItem(id, fromFavorites = false) {
@@ -3561,7 +3591,9 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     if (F.fav) return;
                     if (digits && !String(i.formattedNumber).replace(/\D/g, '').includes(digits)) return;
                     if (country && this.countryLabel(i) !== country) return;
-                    if (pattern && !String(i.patternDesc || '').split(' • ').map(s => s.trim()).includes(pattern)) return;
+                    if (pattern && !this.getNumberPatternAnalysis(i).matches.some(match => match.name === pattern)) return;
+                    if (digits && !String(i.formattedNumber).replace(/\\D/g, '').includes(digits)) return;
+                    if (country && this.countryLabel(i) !== country) return;
                     this.selectedMarketIds.add(i.id);
                 });
                 this.renderMarket();
