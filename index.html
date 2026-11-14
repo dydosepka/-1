@@ -611,6 +611,12 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     <p class="text-[11px] text-sky-200/80">Редкие номера за TON</p>
                 </div>
 
+                <div onclick="app.switchTab('exchange')" class="glass-card p-4 rounded-2xl cursor-pointer hover:border-emerald-400/60 transition relative overflow-hidden group">
+                    <div class="menu-icon-tile text-emerald-300 group-hover:scale-105 transition"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+                    <h3 class="font-bold text-white text-sm">Обменник</h3>
+                    <p class="text-[11px] text-emerald-200/80">Рубли → доллары → TON</p>
+                </div>
+
                 <div onclick="app.switchTab('chances')" class="glass-card p-4 rounded-2xl cursor-pointer hover:border-fuchsia-400/60 transition relative overflow-hidden group">
                     <div class="menu-icon-tile text-fuchsia-300 group-hover:scale-105 transition"><i class="fa-solid fa-chart-pie"></i></div>
                     <h3 class="font-bold text-white text-sm">Шансы</h3>
@@ -868,6 +874,33 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             <p class="text-[10px] leading-relaxed text-slate-500 px-1">Шансы для обычных–мифических номеров указаны по заданным игровым значениям. Для экзотических и секретных серий показана оценка по весам их выпадения в пуле номеров.</p>
         </section>
 
+        <!-- SECTION: CURRENCY EXCHANGE -->
+        <section id="sec-exchange" class="hidden absolute inset-0 bg-[#0b0d14] z-30 p-4 overflow-y-auto space-y-5">
+            <div class="flex items-center justify-between">
+                <div><h2 class="text-xl font-black text-white">Обменник</h2><p class="text-xs text-slate-400 mt-1">Обмен валюты по фиксированному курсу</p></div>
+                <button type="button" onclick="app.switchTab('menu')" class="text-slate-400 hover:text-white text-lg" aria-label="Закрыть обменник"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="glass-panel rounded-2xl p-4 grid grid-cols-3 gap-2 text-center">
+                <div><div class="text-[10px] text-slate-400">РУБЛИ</div><strong id="exchange-balance-rub" class="text-sm text-white break-all">0 ₽</strong></div>
+                <div><div class="text-[10px] text-slate-400">ДОЛЛАРЫ</div><strong id="exchange-balance-usd" class="text-sm text-amber-300 break-all">0 $</strong></div>
+                <div><div class="text-[10px] text-slate-400">TON</div><strong id="exchange-balance-ton" class="text-sm text-sky-300 break-all">0 TON</strong></div>
+            </div>
+            <div class="glass-card rounded-2xl p-5 space-y-4">
+                <div><h3 class="font-black text-white">Рубли → доллары</h3><p class="text-xs text-emerald-300 mt-1">1 000 000 ₽ = 1 $</p></div>
+                <label for="exchange-usd-amount" class="block text-xs text-slate-300">Сколько долларов получить</label>
+                <div class="flex gap-2"><input id="exchange-usd-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="1" oninput="app.renderExchangeUI()" class="min-w-0 flex-1 rounded-xl bg-slate-950 border border-slate-600 px-3 py-3 text-white outline-none focus:border-emerald-400"><button type="button" onclick="app.maxExchange('usd')" class="px-3 rounded-xl border border-slate-600 text-xs font-bold text-slate-200">МАКС.</button></div>
+                <p id="exchange-usd-preview" class="text-xs text-slate-400" aria-live="polite">Укажите сумму.</p>
+                <button id="exchange-usd-button" type="button" onclick="app.exchangeCurrency('usd')" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold">Обменять на $</button>
+            </div>
+            <div class="glass-card rounded-2xl p-5 space-y-4">
+                <div><h3 class="font-black text-white">Доллары → TON</h3><p class="text-xs text-sky-300 mt-1">100 $ = 1 TON</p></div>
+                <label for="exchange-ton-amount" class="block text-xs text-slate-300">Сколько TON получить</label>
+                <div class="flex gap-2"><input id="exchange-ton-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="1" oninput="app.renderExchangeUI()" class="min-w-0 flex-1 rounded-xl bg-slate-950 border border-slate-600 px-3 py-3 text-white outline-none focus:border-sky-400"><button type="button" onclick="app.maxExchange('ton')" class="px-3 rounded-xl border border-slate-600 text-xs font-bold text-slate-200">МАКС.</button></div>
+                <p id="exchange-ton-preview" class="text-xs text-slate-400" aria-live="polite">Укажите сумму.</p>
+                <button id="exchange-ton-button" type="button" onclick="app.exchangeCurrency('ton')" class="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold">Обменять на TON</button>
+            </div>
+        </section>
+
         <!-- SECTION: TON AUCTION -->
         <section id="sec-auction" class="hidden absolute inset-0 bg-[#0b0d14] z-30 p-4 overflow-y-auto space-y-4">
             <div class="flex items-center justify-between">
@@ -981,13 +1014,13 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 </div>
 
                 <!-- Max Capacity Upgrade Card -->
-                <div class="glass-card p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+                <div class="glass-card p-4 rounded-xl border border-slate-800 flex items-center justify-between gap-3">
                     <div>
                         <h3 class="font-bold text-white text-sm">Вместимость Коллекции</h3>
                         <p id="upg-capacity-level" class="text-xs text-slate-400">Лимит: 50 слотов</p>
                     </div>
-                    <button id="btn-upg-capacity" onclick="app.buyUpgrade('capacity')" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
-                        Улучшить (+150 мест) (<span id="upg-capacity-cost">300 000 ₽</span>)
+                    <button id="btn-upg-capacity-usd" onclick="app.buyUpgrade('capacityUsd')" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition disabled:opacity-40 disabled:cursor-not-allowed">
+                        Улучшить (+150 мест) за 300 $
                     </button>
                 </div>
 
@@ -998,7 +1031,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                         <p id="upg-fav-capacity-level" class="text-xs text-slate-400">Лимит: 3 / 500 слотов</p>
                     </div>
                     <button id="btn-upg-fav-capacity" onclick="app.buyUpgrade('favCapacity')" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold text-xs transition">
-                        Улучшить (+20 слотов) (<span id="upg-fav-capacity-cost">1 000 000 ₽</span>)
+                        Улучшить (+20 слотов) (<span id="upg-fav-capacity-cost">10 000 000 ₽</span>)
                     </button>
                 </div>
             </div>
@@ -2165,10 +2198,70 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 }
             }
 
+            exchangeQuote(kind) {
+                const input = document.getElementById(kind === 'usd' ? 'exchange-usd-amount' : 'exchange-ton-amount');
+                const raw = input?.value || '';
+                const amount = Number(raw);
+                const rate = kind === 'usd' ? 1000000 : 100;
+                const balance = Number(kind === 'usd' ? this.state.balance : this.state.usdBalance);
+                const cost = amount * rate;
+                const valid = raw !== '' && Number.isSafeInteger(amount) && amount > 0 && Number.isSafeInteger(cost);
+                return { amount, cost, balance, valid, affordable: valid && balance >= cost };
+            }
+
+            renderExchangeUI() {
+                const rub = document.getElementById('exchange-balance-rub');
+                if (!rub) return;
+                rub.textContent = Number(this.state.balance || 0).toLocaleString('ru-RU') + ' ₽';
+                document.getElementById('exchange-balance-usd').textContent = Number(this.state.usdBalance || 0).toLocaleString('ru-RU') + ' $';
+                document.getElementById('exchange-balance-ton').textContent = Number(this.state.tonBalance || 0).toLocaleString('ru-RU') + ' TON';
+                for (const kind of ['usd', 'ton']) {
+                    const quote = this.exchangeQuote(kind);
+                    const preview = document.getElementById('exchange-' + kind + '-preview');
+                    const button = document.getElementById('exchange-' + kind + '-button');
+                    const symbol = kind === 'usd' ? '₽' : '$';
+                    preview.textContent = !quote.valid ? 'Укажите целое положительное количество.'
+                        : quote.affordable ? `Спишется ${quote.cost.toLocaleString('ru-RU')} ${symbol}.`
+                        : `Нужно ${quote.cost.toLocaleString('ru-RU')} ${symbol} — недостаточно средств.`;
+                    preview.classList.toggle('text-rose-400', quote.valid && !quote.affordable);
+                    button.disabled = !quote.affordable;
+                }
+            }
+
+            maxExchange(kind) {
+                const rate = kind === 'usd' ? 1000000 : 100;
+                const balance = Number(kind === 'usd' ? this.state.balance : this.state.usdBalance);
+                const input = document.getElementById(kind === 'usd' ? 'exchange-usd-amount' : 'exchange-ton-amount');
+                input.value = String(Math.max(0, Math.floor(balance / rate)));
+                this.renderExchangeUI();
+            }
+
+            exchangeCurrency(kind) {
+                if (kind !== 'usd' && kind !== 'ton') return;
+                const quote = this.exchangeQuote(kind);
+                if (!quote.affordable) {
+                    this.showToast('Проверьте сумму и баланс.', 'error');
+                    this.renderExchangeUI();
+                    return;
+                }
+                if (kind === 'usd') {
+                    this.state.balance -= quote.cost;
+                    this.state.usdBalance = Number(this.state.usdBalance || 0) + quote.amount;
+                } else {
+                    this.state.usdBalance -= quote.cost;
+                    this.state.tonBalance = Number(this.state.tonBalance || 0) + quote.amount;
+                }
+                this.saveState();
+                this.updateUIHeader();
+                document.getElementById(kind === 'usd' ? 'exchange-usd-amount' : 'exchange-ton-amount').value = '';
+                this.renderExchangeUI();
+                this.showToast(`Обмен завершён: +${quote.amount.toLocaleString('ru-RU')} ${kind === 'usd' ? '$' : 'TON'}.`, 'success');
+            }
+
             switchTab(tabId) {
                 if (this.isRevealing) return;
                 this.activeTab = tabId;
-                ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event', 'auction', 'chances'].forEach(s => {
+                ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event', 'auction', 'chances', 'exchange'].forEach(s => {
                     const el = document.getElementById(`sec-${s}`);
                     if (el) el.classList.add('hidden');
                 });
@@ -2183,6 +2276,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (tabId === 'upgrades') this.renderUpgradesUI();
                 if (tabId === 'event') this.renderEventUI();
                 if (tabId === 'auction') this.renderAuctionUI();
+                if (tabId === 'exchange') this.renderExchangeUI();
             }
 
             // -------------------------------------------------------------
@@ -3518,19 +3612,16 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 }
 
                 const capLevelEl = document.getElementById('upg-capacity-level');
-                const capCostEl = document.getElementById('upg-capacity-cost');
                 const curCap = this.state.upgrades.maxCapacity || 50;
                 if (capLevelEl) capLevelEl.textContent = `Лимит: ${curCap} / 2 000 слотов`;
-                const capCost = Math.floor(300000 * Math.pow(1.65, Math.max(0, (curCap - 50) / 150)));
-                if (capCostEl) capCostEl.textContent = curCap >= 2000 ? 'MAX' : `${capCost.toLocaleString()} ₽`;
-                const capBtn = document.getElementById('btn-upg-capacity');
-                if (capBtn) { capBtn.disabled = curCap >= 2000; capBtn.innerHTML = curCap >= 2000 ? 'Максимум' : `Улучшить (+150 мест) (<span id="upg-capacity-cost">${capCost.toLocaleString()} ₽</span>)`; }
+                const capUsdBtn = document.getElementById('btn-upg-capacity-usd');
+                if (capUsdBtn) { capUsdBtn.disabled = curCap >= 2000; capUsdBtn.textContent = curCap >= 2000 ? 'Максимум' : 'Улучшить (+150 мест) за 300 $'; }
 
                 const favCapLevelEl = document.getElementById('upg-fav-capacity-level');
                 const favCapCostEl = document.getElementById('upg-fav-capacity-cost');
                 const curFavCap = this.state.upgrades.maxFavCapacity || 3;
                 if (favCapLevelEl) favCapLevelEl.textContent = `Лимит: ${curFavCap} / 500 слотов`;
-                const favCost = 1000000;
+                const favCost = 10000000;
                 if (favCapCostEl) favCapCostEl.textContent = curFavCap >= 500 ? 'MAX' : `${favCost.toLocaleString()} ₽`;
                 const favBtn = document.getElementById('btn-upg-fav-capacity');
                 if (favBtn) { favBtn.disabled = curFavCap >= 500; favBtn.innerHTML = curFavCap >= 500 ? 'Максимум' : `Улучшить (+20 слотов) (${favCost.toLocaleString()} ₽)`; }
@@ -3551,21 +3642,23 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     this.state.upgrades.autoSpeed = Math.min(15, currentLevel + 1);
                     this.showToast(`Авто-прокрутка: ${this.state.upgrades.autoSpeed} кликов/сек!`, 'success');
                 } else if (type === 'capacity') {
+                    this.showToast('Вместимость коллекции улучшается только за $', 'info');
+                    return;
+                } else if (type === 'capacityUsd') {
                     const currentCap = this.state.upgrades.maxCapacity || 50;
                     if (currentCap >= 2000) { this.showToast('Вместимость уже максимальная: 2 000 слотов', 'info'); return; }
-                    const cost = Math.floor(300000 * Math.pow(1.65, Math.max(0, (currentCap - 50) / 150)));
-                    if (this.state.balance < cost) {
-                        this.showToast(`Недостаточно ₽! Требуется ${cost.toLocaleString()} ₽`, 'error');
+                    const cost = 300;
+                    if (Number(this.state.usdBalance || 0) < cost) {
+                        this.showToast('Недостаточно $! Требуется 300 $', 'error');
                         return;
                     }
-
-                    this.state.balance -= cost;
+                    this.state.usdBalance -= cost;
                     this.state.upgrades.maxCapacity = Math.min(2000, currentCap + 150);
                     this.showToast(`Вместимость коллекции увеличена до ${this.state.upgrades.maxCapacity}!`, 'success');
                 } else if (type === 'favCapacity') {
                     const currentFavCap = this.state.upgrades.maxFavCapacity || 3;
                     if (currentFavCap >= 500) { this.showToast('Слоты Избранного уже максимальны: 500', 'info'); return; }
-                    const cost = 1000000;
+                    const cost = 10000000;
                     if (this.state.balance < cost) {
                         this.showToast(`Недостаточно ₽! Требуется ${cost.toLocaleString()} ₽`, 'error');
                         return;
@@ -4626,7 +4719,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             document.addEventListener('pointerdown', function(event) {
                 if (!app || app.activeTab !== 'generator') return;
                 if (event.target.closest('#sec-generator')) return; // внутри генератора уже обрабатывается
-                if (event.target.closest('button, a, input, select, textarea, [role="dialog"], #sec-menu, #sec-market, #sec-profile, #sec-favorites, #sec-upgrades, #sec-quests, #sec-event')) return;
+                if (event.target.closest('button, a, input, select, textarea, [role="dialog"], #sec-menu, #sec-market, #sec-exchange, #sec-profile, #sec-favorites, #sec-upgrades, #sec-quests, #sec-event')) return;
                 if (event.pointerType === 'mouse' && event.button !== 0) return;
                 app.handleTapToOpen();
             }, { passive: true });
