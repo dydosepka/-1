@@ -4894,7 +4894,10 @@ body[data-theme="blue"] { background:#0b1220 !important; }
   };
 
   App.prototype.archiveConflict = function (label, value) {
-    try { localStorage.setItem(`numix_recovery_${label}_${Date.now()}`, JSON.stringify(value)); } catch (error) { console.warn('Local conflict backup unavailable:', error); }
+    try {
+      localStorage.setItem(`numix_recovery_${label}_${Date.now()}`, JSON.stringify(value));
+      return true;
+    } catch (error) { console.warn('Local conflict backup unavailable:', error); return false; }
   };
 
   App.prototype.applyCloudData = function (profile, items = []) {
@@ -5091,7 +5094,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
         this.showCloudConflict(current.profile, current.items, userId);
         return this.showToast('Облако изменилось. Проверьте конфликт ещё раз.', 'error');
       }
-      this.archiveConflict('cloud', { profile: current.profile, items: current.items });
+      if (!this.archiveConflict('cloud', { profile: current.profile, items: current.items }))
+        throw new Error('Недостаточно места для резервной копии облака. Данные не перезаписаны.');
       this._cloudRevision = Number(current.profile.save_revision || 0);
       this._cloudReady = true;
       this._cloudDirty = true;
@@ -5104,7 +5108,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
   App.prototype.chooseCloudProgress = function () {
     if (!this._pendingCloudProfile) return;
-    this.archiveConflict('local', this.makeCloudPayload());
+    if (!this.archiveConflict('local', this.makeCloudPayload()))
+      return this.showToast('Недостаточно места для резервной копии устройства. Данные не перезаписаны.', 'error');
     this.applyCloudData(this._pendingCloudProfile, this._pendingCloudItems || []);
     document.getElementById('conflictModal').style.display = 'none';
     this.showToast('Весь прогресс загружен из облака.', 'success');
