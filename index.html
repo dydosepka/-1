@@ -4417,6 +4417,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             const card = document.getElementById('null-menu-card');
             if (card) card.style.display = 'block';
             try { localStorage.setItem('nullWorldUnlocked', '1'); } catch(e) {}
+            window.app?.queueCloudSync?.();
         }
         function openNullWorld() {
             const warp = document.getElementById('null-warp');
@@ -4516,6 +4517,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
         let nullProgress = loadNullProgress();
         function saveNullProgress() {
             try { localStorage.setItem(nullSaveKey,JSON.stringify({stage:nullProgress.stage,found:nullProgress.found,restored:nullProgress.restored,visited:nullProgress.visited,synth:nullProgress.synth,tuning:nullProgress.tuning})); } catch(e) {}
+            window.app?.queueCloudSync?.();
         }
         function nullFeedback(message) {
             nullProgress.feedback = message;
@@ -4726,6 +4728,533 @@ body[data-theme="blue"] { background:#0b1220 !important; }
         };
     </script>
 
+<script id="numix-cloud-sync-v2">
+/* NumixSpin cloud synchronization v2. The existing email OTP flow remains unchanged. */
+(() => {
+  const META_KEY = 'numix_cloud_meta_v2';
+  const ROULETTE_KEY = 'tg_gifts_roulette_v2';
+  const NULL_KEY = 'null_project_zero_v2';
+  const LOCAL_KEY = 'pnt_save_v2';
+  const oldSaveState = App.prototype.saveState;
+  const oldAuthenticateAdmin = App.prototype.authenticateAdmin;
+
+  const readJson = key => { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) { return null; } };
+  const copy = value => JSON.parse(JSON.stringify(value));
+  const itemId = item => typeof item === 'string' ? item : item?.id;
+
+  App.prototype.makeCloudPayload = function () {
+    const state = copy(this.state);
+    delete state.cloudUser;
+    delete state.authPendingEmail;
+    delete state.authPendingCode;
+    const roulette = readJson(ROULETTE_KEY);
+    if (roulette && typeof roulette === 'object') roulette.balance = Math.max(0, Math.floor(Number(state.balance) || 0));
+    return {
+      version: 2,
+      state,
+      roulette: roulette && typeof roulette === 'object' ? roulette : null,
+      nullProgress: readJson(NULL_KEY),
+      nullUnlocked: localStorage.getItem('nullWorldUnlocked') === '1'
+    };
+  };
+
+  App.prototype.cloudPayloadHash = function (payload) {
+    const text = JSON.stringify(payload);
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+    return `${text.length}:${hash >>> 0}`;
+  };
+
+  App.prototype.cloudMeta = function () { return readJson(META_KEY) || {}; };
+  App.prototype.rememberCloudRevision = function (userId, revision) {
+    this._cloudRevision = Number(revision || 0);
+    this._lastCloudHash = this.cloudPayloadHash(this.makeCloudPayload());
+    try { localStorage.setItem(META_KEY, JSON.stringify({ userId, revision: this._cloudRevision, hash: this._lastCloudHash })); } catch (_) {}
+  };
+
+  App.prototype.hasMeaningfulLocalProgress = function () {
+    const s = this.state;
+    const q = s.quests || {};
+    const u = s.upgrades || {};
+    const p = s.profile || {};
+    const roulette = readJson(ROULETTE_KEY) || {};
+    const nullProgress = readJson(NULL_KEY) || {};
+    return Number(s.balance) !== 450000 || Number(s.usdBalance) !== 50 || Number(s.tonBalance || 0) !== 0
+      || (s.collection || []).length > 0 || (s.eventSecretSold || []).length > 0
+      || (p.pinnedGifts || []).length > 0 || !!p.bio || !!p.dob || (p.nickname && p.nickname !== 'Тайкун Игрок')
+      || Number(u.autoSpeed || 0) > 0 || Number(u.maxCapacity || 50) > 50 || Number(u.maxFavCapacity || 3) > 3
+      || Number(q.sellCount || 0) > 0 || Number(q.legendaryDropCount || 0) > 0 || Number(q.salesEarnings || 0) > 0
+      || JSON.stringify(s.preferences || {}) !== JSON.stringify(this._blankCloudState?.preferences || {})
+      || JSON.stringify(s.autoSell || {}) !== JSON.stringify(this._blankCloudState?.autoSell || {})
+      || !!q.grandBonusClaimed || !!q.grandBonusRubClaimed || !!q.grandBonusUsdClaimed
+      || (roulette.inventory || []).length > 0 || (roulette.history || []).length > 0
+      || Number(nullProgress.stage || 1) > 1 || (nullProgress.restored || []).some(Boolean)
+      || (s.promocodes || []).some(x => x.used);
+  };
+
+  App.prototype.queueCloudSync = function () {
+    if (!this._cloudReady || this._applyingCloud || !this.state.cloudUser?.id) return;
+    const hash = this.cloudPayloadHash(this.makeCloudPayload());
+    if (hash === this._lastCloudHash) return;
+    this._cloudDirty = true;
+    clearTimeout(this._cloudDebounce);
+    this._cloudDebounce = setTimeout(() => {
+      this.saveUserDataToCloud(this.state.cloudUser?.id).catch(error => console.error('Cloud auto save:', error));
+    }, 3000);
+  };
+
+  App.prototype.saveState = function () {
+    oldSaveState.call(this);
+    this.queueCloudSync();
+  };
+
+  App.prototype.cloudItemsForSave = function () {
+    const seen = new Set();
+    return (this.state.collection || []).filter(item => {
+      if (!item?.id || seen.has(String(item.id))) return false;
+      seen.add(String(item.id));
+      return true;
+    }).map(item => ({
+      id: String(item.id),
+      formatted_number: item.formattedNumber || '',
+      flag: item.flag || '🇷🇺',
+      rarity_key: item.rarityKey || 'common',
+      price: Number(item.price || 0),
+      pattern_desc: this.encodeCloudItemMeta(item),
+      is_favorite: !!item.isFavorite
+    }));
+  };
+
+  App.prototype.fetchCloudRecords = async function (userId) {
+    const { data: profile, error: profileError } = await supabaseClient.from('profiles').select('*').eq('id', userId).maybeSingle();
+    if (profileError) throw profileError;
+    const items = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabaseClient.from('user_items').select('*').eq('user_id', userId).order('id').range(from, from + 999);
+      if (error) throw error;
+      items.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    return { profile, items };
+  };
+
+  App.prototype.legacyCloudState = function (profile, items) {
+    const state = copy(this._blankCloudState || this.state);
+    state.balance = Number(profile?.balance ?? 450000);
+    state.usdBalance = Number(profile?.usd_balance ?? 50);
+    state.tonBalance = Number(profile?.ton_balance ?? 0);
+    state.profile.userId = profile?.player_id || state.profile.userId || this.state.profile?.userId || '';
+    state.profile.nickname = profile?.nickname || state.profile.nickname;
+    state.collection = (items || []).map(row => {
+      const decoded = this.decodeCloudItemMeta(row.pattern_desc || '');
+      return this.normalizeCollectionItem({
+        id: row.id, formattedNumber: row.formatted_number || '', flag: row.flag || '🇷🇺',
+        rarityKey: row.rarity_key || 'common', price: Number(row.price || 0),
+        patternDesc: decoded.patternDesc, isFavorite: !!row.is_favorite, ...decoded.meta
+      });
+    });
+    state.favorites = state.collection.filter(item => item.isFavorite);
+    state.profile.selectedNumberId = state.collection.find(item => item._selectedMain)?.id || null;
+    state.upgrades.maxCapacity = Math.min(2000, Math.max(50, 50 + 150 * Math.ceil(Math.max(0, state.collection.length - 50) / 150)));
+    return state;
+  };
+
+  App.prototype.cloudPayloadFromRecords = function (profile, items) {
+    const source = profile?.data;
+    const legacy = !source || source.version !== 2 || !source.state;
+    const payload = legacy
+      ? { version: 2, state: this.legacyCloudState(profile, items), roulette: null, nullProgress: null, nullUnlocked: false }
+      : copy(source);
+    let externalChanges = false;
+    if (!legacy) {
+      const state = payload.state;
+      for (const [key, column] of [['balance','balance'],['usdBalance','usd_balance'],['tonBalance','ton_balance']]) {
+        const dbValue = Number(profile[column] || 0);
+        if (Number(state[key] || 0) !== dbValue) { state[key] = dbValue; externalChanges = true; }
+      }
+      if (profile.nickname && state.profile?.nickname !== profile.nickname) {
+        state.profile = { ...(state.profile || {}), nickname: profile.nickname };
+        externalChanges = true;
+      }
+      const ids = new Set((state.collection || []).map(item => String(item.id)));
+      for (const row of items || []) {
+        if (row.sync_revision !== null && row.sync_revision !== undefined || ids.has(String(row.id))) continue;
+        const decoded = this.decodeCloudItemMeta(row.pattern_desc || '');
+        state.collection = state.collection || [];
+        state.collection.push(this.normalizeCollectionItem({
+          id: row.id, formattedNumber: row.formatted_number || '', flag: row.flag || '🇷🇺',
+          rarityKey: row.rarity_key || 'common', price: Number(row.price || 0),
+          patternDesc: decoded.patternDesc, isFavorite: !!row.is_favorite, ...decoded.meta
+        }));
+        ids.add(String(row.id));
+        externalChanges = true;
+      }
+    }
+    return { payload, legacy, externalChanges };
+  };
+
+  App.prototype.archiveConflict = function (label, value) {
+    try { localStorage.setItem(`numix_recovery_${label}_${Date.now()}`, JSON.stringify(value)); } catch (error) { console.warn('Local conflict backup unavailable:', error); }
+  };
+
+  App.prototype.applyCloudData = function (profile, items = []) {
+    if (!profile) throw new Error('Облачный профиль не найден.');
+    const { payload, legacy, externalChanges } = this.cloudPayloadFromRecords(profile, items);
+    const user = this.state.cloudUser;
+    const state = payload.state;
+    this._applyingCloud = true;
+    try {
+      this.state = {
+        ...copy(this._blankCloudState || {}), ...state,
+        profile: { ...copy(this._blankCloudState?.profile || {}), ...(state.profile || {}) },
+        upgrades: { ...copy(this._blankCloudState?.upgrades || {}), ...(state.upgrades || {}) },
+        quests: { ...copy(this._blankCloudState?.quests || {}), ...(state.quests || {}) },
+        cloudUser: { ...(user || {}), id: profile.id, lastSync: Date.now() }
+      };
+      this.state.collection = (Array.isArray(state.collection) ? state.collection : []).map(item => this.normalizeCollectionItem(item));
+      const favoriteIds = new Set((Array.isArray(state.favorites) ? state.favorites : []).map(itemId).filter(Boolean));
+      this.state.collection.forEach(item => { if (item.isFavorite) favoriteIds.add(item.id); });
+      this.state.favorites = this.state.collection.filter(item => favoriteIds.has(item.id));
+      this.state.favorites.forEach(item => { item.isFavorite = true; });
+      if (payload.roulette) localStorage.setItem(ROULETTE_KEY, JSON.stringify(payload.roulette));
+      else localStorage.removeItem(ROULETTE_KEY);
+      if (payload.nullProgress) localStorage.setItem(NULL_KEY, JSON.stringify(payload.nullProgress));
+      else localStorage.removeItem(NULL_KEY);
+      if (payload.nullUnlocked) localStorage.setItem('nullWorldUnlocked', '1');
+      else localStorage.removeItem('nullWorldUnlocked');
+      if (payload.nullUnlocked) unlockNullWorld();
+      else { const card = document.getElementById('null-menu-card'); if (card) card.style.display = 'none'; }
+      if (typeof loadNullProgress === 'function') nullProgress = loadNullProgress();
+      this.currentDrop = null;
+      this.selectedMarketIds?.clear();
+      this.saveState();
+      this.updateUIHeader();
+      this.renderProfileUI();
+      this.renderCollection();
+      this.renderMarket();
+      this.renderAuctionUI();
+      this.renderFavorites();
+      this.renderEventUI();
+      this.renderQuestsUI();
+      this.renderUpgradesUI();
+      this.renderSettingsPreferences();
+      this.renderExchangeUI?.();
+      if (typeof renderNullWorld === 'function') renderNullWorld();
+      window.giftLink?.reloadFromCloud?.();
+      this.renderCloudUI();
+    } finally { this._applyingCloud = false; }
+    this._cloudReady = true;
+    this.rememberCloudRevision(profile.id, profile.save_revision);
+    this._cloudDirty = legacy || externalChanges;
+    if (this._cloudDirty) { this._lastCloudHash = null; this.queueCloudSync(); }
+  };
+
+  App.prototype.showCloudConflict = function (profile, items, userId) {
+    this._cloudReady = false;
+    clearTimeout(this._cloudDebounce);
+    this._pendingCloudProfile = profile;
+    this._pendingCloudItems = items;
+    this._pendingCloudUserId = userId;
+    document.getElementById('localBalanceVal').textContent = Number(this.state.balance || 0).toLocaleString('ru-RU');
+    document.getElementById('cloudBalanceVal').textContent = Number(profile?.balance || 0).toLocaleString('ru-RU');
+    document.getElementById('conflictModal').style.display = 'flex';
+    this.renderCloudUI();
+  };
+
+  App.prototype.handleSuccessfulLogin = async function (user) {
+    if (!supabaseClient || !user?.id) throw new Error('Не удалось определить пользователя Supabase.');
+    const { data: verified, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || verified?.user?.id !== user.id) throw authError || new Error('Сессия пользователя не подтверждена.');
+    this._cloudReady = false;
+    this.state.cloudUser = { id: user.id, email: verified.user.email || user.email || '', lastSync: 0 };
+    let { profile, items } = await this.fetchCloudRecords(user.id);
+    if (!profile) {
+      const { error } = await supabaseClient.from('profiles').insert({ id: user.id, player_id: this.state.profile?.userId || null });
+      if (error && error.code !== '23505') throw error;
+      ({ profile, items } = await this.fetchCloudRecords(user.id));
+    }
+    if (!profile) throw new Error('Не удалось создать облачный профиль.');
+    const meta = this.cloudMeta();
+    const localHash = this.cloudPayloadHash(this.makeCloudPayload());
+    const localDirty = this.hasMeaningfulLocalProgress() &&
+      (meta.userId !== user.id || meta.hash !== localHash);
+    const remote = this.cloudPayloadFromRecords(profile, items);
+    const remoteMeaningful = !remote.legacy || Number(profile.balance || 0) !== 450000
+      || Number(profile.usd_balance || 0) !== 50 || Number(profile.ton_balance || 0) !== 0 || items.length > 0;
+    if (localDirty && remoteMeaningful) {
+      if (meta.userId === user.id && Number(meta.revision) === Number(profile.save_revision || 0) && !remote.externalChanges) {
+        this._cloudRevision = Number(profile.save_revision || 0);
+        this._cloudReady = true;
+        this._cloudDirty = true;
+        await this.saveUserDataToCloud(user.id);
+      } else {
+        this.showCloudConflict(profile, items, user.id);
+      }
+    } else if (localDirty && !remoteMeaningful) {
+      this._cloudRevision = Number(profile.save_revision || 0);
+      this._cloudReady = true;
+      this._cloudDirty = true;
+      await this.saveUserDataToCloud(user.id);
+    } else {
+      this.applyCloudData(profile, items);
+    }
+    this.renderCloudUI();
+    return true;
+  };
+
+  App.prototype.restoreCloudSession = async function () {
+    if (!supabaseClient) return;
+    try {
+      const { data, error } = await supabaseClient.auth.getUser();
+      if (error || !data?.user) {
+        this._cloudReady = false;
+        this.state.cloudUser = null;
+        this.renderCloudUI();
+        return;
+      }
+      await this.handleSuccessfulLogin(data.user);
+    } catch (error) { console.error('Session restoration:', error); this._cloudReady = false; this.renderCloudUI(); }
+  };
+
+  App.prototype.saveUserDataToCloud = async function (userId) {
+    if (this._cloudSavePromise) { this._cloudSaveQueued = true; return this._cloudSavePromise; }
+    this._cloudSavePromise = this._saveUserDataToCloudOnce(userId);
+    try { return await this._cloudSavePromise; }
+    finally {
+      this._cloudSavePromise = null;
+      if (this._cloudSaveQueued && this._cloudReady) {
+        this._cloudSaveQueued = false;
+        this.queueCloudSync();
+      }
+    }
+  };
+
+  App.prototype._saveUserDataToCloudOnce = async function (userId) {
+    if (!supabaseClient || !this._cloudReady || !userId || this.state.cloudUser?.id !== userId)
+      throw new Error('Облачная синхронизация не готова.');
+    const { data: verified, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || verified?.user?.id !== userId) throw authError || new Error('Сессия аккаунта истекла.');
+    const payload = this.makeCloudPayload();
+    const hash = this.cloudPayloadHash(payload);
+    if (hash === this._lastCloudHash) { this._cloudDirty = false; return true; }
+    const items = this.cloudItemsForSave();
+    if (items.length !== payload.state.collection.length) throw new Error('В коллекции есть повторяющиеся или пустые ID. Сохранение остановлено.');
+    const { data, error } = await supabaseClient.rpc('save_numix_progress', {
+      p_expected_revision: this._cloudRevision, p_state: payload, p_items: items
+    });
+    if (error) {
+      if (String(error.message || '').includes('save_revision_conflict')) {
+        const remote = await this.fetchCloudRecords(userId);
+        this.showCloudConflict(remote.profile, remote.items, userId);
+      }
+      throw error;
+    }
+    const revision = Number(data?.[0]?.new_revision);
+    if (!Number.isFinite(revision)) throw new Error('Supabase не подтвердил версию сохранения.');
+    this._cloudRevision = revision;
+    this._lastCloudHash = hash;
+    try { localStorage.setItem(META_KEY, JSON.stringify({ userId, revision, hash })); } catch (_) {}
+    this.state.cloudUser.lastSync = Date.now();
+    this._cloudDirty = this.cloudPayloadHash(this.makeCloudPayload()) !== hash;
+    oldSaveState.call(this);
+    this.renderCloudUI();
+    if (this._cloudDirty) this.queueCloudSync();
+    return true;
+  };
+
+  App.prototype.cloudSyncNow = async function () {
+    if (!this._cloudReady) return this.showToast('Сначала войдите в аккаунт и решите конфликт сохранений.', 'error');
+    try { await this.saveUserDataToCloud(this.state.cloudUser.id); this.showToast('Весь прогресс сохранён в облаке.', 'success'); }
+    catch (error) { this.showToast(error?.message || 'Не удалось сохранить прогресс.', 'error'); }
+  };
+
+  App.prototype.cloudLoadNow = async function () {
+    if (!this.state.cloudUser?.id) return this.showToast('Сначала войдите в аккаунт.', 'error');
+    if (!this._cloudReady) return this.showToast('Сначала решите конфликт сохранений.', 'error');
+    try {
+      const { profile, items } = await this.fetchCloudRecords(this.state.cloudUser.id);
+      if (!profile) throw new Error('Облачный профиль не найден.');
+      const dirty = this._cloudReady && this.cloudPayloadHash(this.makeCloudPayload()) !== this._lastCloudHash;
+      if (dirty) return this.showCloudConflict(profile, items, this.state.cloudUser.id);
+      this.applyCloudData(profile, items);
+      this.showToast('Весь прогресс загружен из облака.', 'success');
+    } catch (error) { console.error('Cloud load:', error); this.showToast(error?.message || 'Не удалось загрузить прогресс.', 'error'); }
+  };
+
+  App.prototype.chooseLocalProgress = async function () {
+    const userId = this._pendingCloudUserId || this.state.cloudUser?.id;
+    if (!userId) return;
+    try {
+      const current = await this.fetchCloudRecords(userId);
+      if (Number(current.profile?.save_revision || 0) !== Number(this._pendingCloudProfile?.save_revision || 0)
+          || current.profile?.updated_at !== this._pendingCloudProfile?.updated_at) {
+        this.showCloudConflict(current.profile, current.items, userId);
+        return this.showToast('Облако изменилось. Проверьте конфликт ещё раз.', 'error');
+      }
+      this.archiveConflict('cloud', { profile: current.profile, items: current.items });
+      this._cloudRevision = Number(current.profile.save_revision || 0);
+      this._cloudReady = true;
+      this._cloudDirty = true;
+      this._lastCloudHash = null;
+      await this.saveUserDataToCloud(userId);
+      document.getElementById('conflictModal').style.display = 'none';
+      this.showToast('Прогресс устройства сохранён в облаке.', 'success');
+    } catch (error) { console.error('Keep local:', error); this.showToast(error?.message || 'Не удалось сохранить прогресс устройства.', 'error'); }
+  };
+
+  App.prototype.chooseCloudProgress = function () {
+    if (!this._pendingCloudProfile) return;
+    this.archiveConflict('local', this.makeCloudPayload());
+    this.applyCloudData(this._pendingCloudProfile, this._pendingCloudItems || []);
+    document.getElementById('conflictModal').style.display = 'none';
+    this.showToast('Весь прогресс загружен из облака.', 'success');
+  };
+
+  App.prototype.cloudLogout = async function () {
+    try {
+      clearTimeout(this._cloudDebounce);
+      this._cloudReady = false;
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) throw error;
+      this.state.cloudUser = null;
+      oldSaveState.call(this);
+      this.renderCloudUI();
+      this.showToast('Вы вышли из аккаунта. Прогресс сохранён на устройстве.', 'info');
+    } catch (error) { this.showToast(error?.message || 'Не удалось выйти из аккаунта.', 'error'); }
+  };
+
+  App.prototype.startCloudAutoSyncTimer = function () {
+    if (this.cloudSyncTimer) clearInterval(this.cloudSyncTimer);
+    this.cloudSyncTimer = setInterval(async () => {
+      if (!this._cloudReady || !this.state.cloudUser?.id) return;
+      try {
+        if (this._cloudDirty || this.cloudPayloadHash(this.makeCloudPayload()) !== this._lastCloudHash) {
+          await this.saveUserDataToCloud(this.state.cloudUser.id);
+          return;
+        }
+        const { profile, items } = await this.fetchCloudRecords(this.state.cloudUser.id);
+        if (profile && (Number(profile.save_revision || 0) > Number(this._cloudRevision || 0)
+            || this.cloudPayloadFromRecords(profile, items).externalChanges)) this.applyCloudData(profile, items);
+      } catch (error) { console.error('Cloud auto sync:', error); }
+    }, 30000);
+  };
+
+  App.prototype.loadUserData = async function (userId) {
+    const { profile, items } = await this.fetchCloudRecords(userId);
+    if (!profile) return false;
+    this.applyCloudData(profile, items);
+    return true;
+  };
+
+  App.prototype.redeemPromocode = async function (code) {
+    if (!this._cloudReady || !this.state.cloudUser?.id)
+      return this.showToast('Сначала войдите в аккаунт и решите конфликт сохранений.', 'error');
+    const cleanCode = String(code || '').trim().toUpperCase();
+    if (!cleanCode) return this.showToast('Введите промокод.', 'error');
+    if (this.cloudPayloadHash(this.makeCloudPayload()) !== this._lastCloudHash)
+      await this.saveUserDataToCloud(this.state.cloudUser.id);
+    const { data, error } = await supabaseClient.rpc('redeem_numix_promocode', {
+      p_code: cleanCode, p_expected_revision: this._cloudRevision
+    });
+    if (error) throw error;
+    const { profile, items } = await this.fetchCloudRecords(this.state.cloudUser.id);
+    this.applyCloudData(profile, items);
+    const reward = data?.[0];
+    this.showToast(`Промокод активирован: +${Number(reward?.awarded_amount || 0).toLocaleString('ru-RU')} ${reward?.awarded_type === 'usd' ? '$' : '₽'}.`, 'success');
+    return true;
+  };
+
+  App.prototype.authenticateAdmin = async function () {
+    if (!this._cloudReady || !this.state.cloudUser?.id)
+      return this.showToast('Войдите в администраторский аккаунт.', 'error');
+    const { data, error } = await supabaseClient.rpc('numix_is_admin');
+    if (error || data !== true) return this.showToast('У этого аккаунта нет прав администратора.', 'error');
+    return oldAuthenticateAdmin.call(this);
+  };
+
+  App.prototype.adminGrantCurrencyById = async function () {
+    const target = document.getElementById('admin-target-user-id')?.value?.trim();
+    const amount = Number(document.getElementById('admin-target-reward-amount')?.value || 0);
+    const kind = document.getElementById('admin-target-reward-type')?.value || 'rub';
+    if (!target || !Number.isFinite(amount) || amount <= 0) return this.showToast('Укажите ID игрока и сумму.', 'error');
+    try {
+      if (target === this.state.profile?.userId && this._cloudReady
+          && this.cloudPayloadHash(this.makeCloudPayload()) !== this._lastCloudHash)
+        await this.saveUserDataToCloud(this.state.cloudUser.id);
+      const { data, error } = await supabaseClient.rpc('numix_admin_grant', {
+        p_target: target, p_kind: kind, p_amount: amount, p_item: null
+      });
+      if (error) throw error;
+      if (data?.user_id === this.state.cloudUser?.id) {
+        const records = await this.fetchCloudRecords(data.user_id);
+        this.applyCloudData(records.profile, records.items);
+      }
+      this.showToast(`Валюта начислена игроку ${target}.`, 'success');
+    } catch (error) { console.error('Admin grant:', error); this.showToast(error?.message || 'Не удалось выдать валюту.', 'error'); }
+  };
+
+  App.prototype.adminGiveRewardToPlayer = async function (targetUserId, rewardType, value) {
+    if (!targetUserId) return this.showToast('Укажите ID игрока.', 'error');
+    const item = rewardType === 'item' ? {
+      formatted_number: value?.number || '+7 (999) 777-77-77', flag: value?.flag || '🇷🇺',
+      rarity_key: value?.rarity || 'mythic', price: Number(value?.price || 1000000),
+      pattern_desc: value?.desc || 'Выдано администратором'
+    } : null;
+    try {
+      if (String(targetUserId) === this.state.cloudUser?.id && this._cloudReady
+          && this.cloudPayloadHash(this.makeCloudPayload()) !== this._lastCloudHash)
+        await this.saveUserDataToCloud(this.state.cloudUser.id);
+      const { data, error } = await supabaseClient.rpc('numix_admin_grant', {
+        p_target: String(targetUserId), p_kind: rewardType,
+        p_amount: item ? null : Number(value), p_item: item
+      });
+      if (error) throw error;
+      if (data?.user_id === this.state.cloudUser?.id) {
+        const records = await this.fetchCloudRecords(data.user_id);
+        this.applyCloudData(records.profile, records.items);
+      }
+      this.showToast('Награда выдана.', 'success');
+      return true;
+    } catch (error) { console.error('Admin reward:', error); this.showToast(error?.message || 'Не удалось выдать награду.', 'error'); return false; }
+  };
+
+  App.prototype.adminCreatePromocode = async function () {
+    const code = document.getElementById('admin-promo-code')?.value?.trim().toUpperCase();
+    const amount = Number(document.getElementById('admin-promo-amount')?.value || 0);
+    const type = document.getElementById('admin-promo-type')?.value || 'rub';
+    const max = Number(document.getElementById('admin-promo-max-uses')?.value || 1);
+    const hours = Number(document.getElementById('admin-promo-duration')?.value || 0);
+    if (!code || !Number.isInteger(amount) || amount <= 0 || !Number.isInteger(max) || max < 1 || !Number.isInteger(hours) || hours < 0)
+      return this.showToast('Укажите корректные параметры промокода.', 'error');
+    const expiresAt = hours ? new Date(Date.now() + hours * 3600000).toISOString() : null;
+    try {
+      const { data, error } = await supabaseClient.rpc('numix_admin_create_promocode', {
+        p_code: code, p_amount: amount, p_type: type, p_max_activations: max, p_expires_at: expiresAt
+      });
+      if (error) throw error;
+      this.state.promocodes = this.state.promocodes || [];
+      this.state.promocodes.push({ code: data || code, amount, type, used: false, activationCount: 0, maxActivations: max, expiresAt: expiresAt ? Date.parse(expiresAt) : null });
+      this.saveState(); this.renderAdminPromocodes();
+      document.getElementById('admin-promo-code').value = '';
+      this.showToast(`Промокод ${data || code} создан.`, 'success');
+      return true;
+    } catch (error) { console.error('Admin promo:', error); this.showToast(error?.message || 'Не удалось создать промокод.', 'error'); return false; }
+  };
+
+  const oldInit = App.prototype.init;
+  App.prototype.init = function () {
+    oldInit.call(this);
+    this.restoreCloudSession();
+  };
+  const oldLoadState = App.prototype.loadState;
+  App.prototype.loadState = function () {
+    this._blankCloudState = copy(this.state);
+    oldLoadState.call(this);
+  };
+})();
+
+</script>
+
 <script id="disable-screen-zoom-script">
 (function () {
   // Disable browser pinch/gesture zoom while keeping ordinary scrolling available.
@@ -4799,6 +5328,16 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
   }
 
   window.giftLink = {
+    reloadFromCloud() {
+      const saved = JSON.parse(localStorage.getItem('tg_gifts_roulette_v2') || 'null') || {};
+      inv = (saved.inventory || []).map(o => {
+        const map = new Map(inv.map(g => [g.id, g]));
+        const g = map.get(o.id);
+        return g ? { ...g, uid: o.u, s: o.s } : null;
+      }).filter(Boolean);
+      if (frame) mount();
+      updateMenuSub(); renderProfile(); renderPicker();
+    },
     goNumbers() { app.switchTab(lastMain); },
     openPicker() { renderPicker(); document.getElementById('gift-picker-modal').classList.remove('hidden'); },
     closePicker() { document.getElementById('gift-picker-modal').classList.add('hidden'); renderProfile(); },
@@ -4828,6 +5367,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     const list = pinned(), kept = list.filter(g => live.has(g.uid));
     if (kept.length !== list.length) { app.state.profile.pinnedGifts = kept; app.saveState(); }
     updateMenuSub(); renderProfile();
+    app.queueCloudSync?.();
     if (!document.getElementById('gift-picker-modal').classList.contains('hidden')) renderPicker();
   });
 
