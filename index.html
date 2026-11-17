@@ -3439,6 +3439,11 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                         this.stopAutoClicker();
                         return;
                     }
+                     if (Number(window.numixProgress?.pendingCount || 0) >= 3000) {
+                         this.stopAutoClicker();
+                         this.showToast('Ожидаем синхронизацию опыта. Автопрокрутка остановлена.', 'info');
+                         return;
+                     }
                     const maxCap = window.numixProgress?.capacity(this.state.upgrades.maxCapacity || 50) || Math.min(2000, this.state.upgrades.maxCapacity || 50);
                     const available = maxCap - this.state.collection.length;
                     const affordable = Math.floor(this.state.balance / 1500);
@@ -5329,16 +5334,31 @@ body[data-theme="blue"] { background:#0b1220 !important; }
   App.prototype.startCloudAutoSyncTimer = function () {
     if (this.cloudSyncTimer) clearInterval(this.cloudSyncTimer);
     this.cloudSyncTimer = setInterval(async () => {
-      if (!this._cloudReady || !this.state.cloudUser?.id) return;
+      if (!this._cloudReady || !this.state.cloudUser?.id || this._cloudPollBusy || this._cloudSavePromise || document.hidden) return;
+      this._cloudPollBusy = true;
       try {
         if (this._cloudDirty || this.cloudPayloadHash(this.makeCloudPayload()) !== this._lastCloudHash) {
           await this.saveUserDataToCloud(this.state.cloudUser.id);
           return;
         }
-        const { profile, items } = await this.fetchCloudRecords(this.state.cloudUser.id);
-        if (profile && (Number(profile.save_revision || 0) > Number(this._cloudRevision || 0)
-            || this.cloudPayloadFromRecords(profile, items).externalChanges)) this.applyCloudData(profile, items);
+        const userId = this.state.cloudUser.id;
+        const { data: head, error } = await supabaseClient.from('profiles')
+          .select('save_revision,balance,usd_balance,ton_balance,nickname').eq('id', userId).maybeSingle();
+        if (error) throw error;
+        if (!head || userId !== this.state.cloudUser?.id || !this._cloudReady) return;
+        const changed = Number(head.save_revision || 0) > Number(this._cloudRevision || 0)
+          || Number(head.balance || 0) !== Number(this.state.balance || 0)
+          || Number(head.usd_balance || 0) !== Number(this.state.usdBalance || 0)
+          || Number(head.ton_balance || 0) !== Number(this.state.tonBalance || 0)
+          || (head.nickname && head.nickname !== this.state.profile?.nickname);
+        if (!changed) return;
+        const { profile, items } = await this.fetchCloudRecords(userId);
+        if (!profile || userId !== this.state.cloudUser?.id || !this._cloudReady) return;
+        if (this.cloudPayloadHash(this.makeCloudPayload()) !== this._lastCloudHash)
+          this.showCloudConflict(profile, items, userId);
+        else this.applyCloudData(profile, items);
       } catch (error) { console.error('Cloud auto sync:', error); }
+      finally { this._cloudPollBusy = false; }
     }, 30000);
   };
 
@@ -5624,7 +5644,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
 (function () {
   const MAX = 6;
   const COL = { common:'#64748b', uncommon:'#10b981', rare:'#3b82f6', epic:'#a855f7', legendary:'#f59e0b', mythic:'#f43f5e' };
-  let frame, rlBal = null, inv = [];
+  let frame, rlBal = null, inv = [], sortedInv = [], giftPickerLimit = 60;
   const fmt = n => Math.round(n).toLocaleString('ru-RU');
   const pinned = () => (app.state.profile.pinnedGifts = app.state.profile.pinnedGifts || []);
   const title = g => g.nft && g.s ? `${g.name} #${g.s}` : g.name;
@@ -5657,9 +5677,10 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     const grid = document.getElementById('gift-picker-grid'); if (!grid) return;
     const sel = new Set(pinned().map(g => g.uid));
     document.getElementById('gift-picker-count').textContent = `${sel.size} / ${MAX}`;
-    const sorted = [...inv].sort((a, b) => b.priceRub - a.priceRub);
-    grid.innerHTML = sorted.length
-      ? sorted.map(g => tile(g, sel.has(g.uid) ? '<div class="absolute top-1 right-1 text-emerald-400 text-xs"><i class="fa-solid fa-circle-check"></i></div>' : '', `giftLink.toggle('${g.uid}')`)).join('')
+    const visible = sortedInv.slice(0, giftPickerLimit);
+    grid.innerHTML = sortedInv.length
+      ? visible.map(g => tile(g, sel.has(g.uid) ? '<div class="absolute top-1 right-1 text-emerald-400 text-xs"><i class="fa-solid fa-circle-check"></i></div>' : '', `giftLink.toggle('${g.uid}')`)).join('')
+        + (sortedInv.length > visible.length ? `<button type="button" onclick="giftLink.showMore()" class="col-span-3 w-full py-3 rounded-xl bg-slate-800 text-slate-200 text-xs font-bold">Показать ещё (${sortedInv.length - visible.length})</button>` : '')
       : '<div class="col-span-3 text-center text-xs text-slate-400 py-4 space-y-3"><p>Инвентарь рулетки пуст.</p><button onclick="giftLink.closePicker();app.switchTab(\'roulette\')" class="px-3 py-2 rounded-xl bg-fuchsia-600 text-white font-bold">Открыть рулетку</button></div>';
   }
 
@@ -5679,16 +5700,19 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
   window.giftLink = {
     reloadFromCloud() {
       const saved = JSON.parse(localStorage.getItem('tg_gifts_roulette_v2') || 'null') || {};
+      const catalog = new Map(inv.map(g => [g.id, g]));
       inv = (saved.inventory || []).map(o => {
-        const map = new Map(inv.map(g => [g.id, g]));
-        const g = map.get(o.id);
+        const g = catalog.get(o.id);
         return g ? { ...g, uid: o.u, s: o.s } : null;
       }).filter(Boolean);
-      if (frame) mount();
-      updateMenuSub(); renderProfile(); renderPicker();
+      sortedInv = [...inv].sort((a, b) => b.priceRub - a.priceRub);
+      if (frame) { frame.dataset.rouletteLoaded = ''; if (app.activeTab === 'roulette') mount(); }
+      updateMenuSub(); renderProfile();
+      if (!document.getElementById('gift-picker-modal').classList.contains('hidden')) renderPicker();
     },
     goNumbers() { app.switchTab(lastMain); },
-    openPicker() { renderPicker(); document.getElementById('gift-picker-modal').classList.remove('hidden'); },
+    openPicker() { giftPickerLimit = 60; renderPicker(); document.getElementById('gift-picker-modal').classList.remove('hidden'); },
+    showMore() { giftPickerLimit += 60; renderPicker(); },
     closePicker() { document.getElementById('gift-picker-modal').classList.add('hidden'); renderProfile(); },
     toggle(uid) {
       const list = pinned(), i = list.findIndex(g => g.uid === uid);
@@ -5712,6 +5736,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     }
     rlBal = b;
     inv = Array.isArray(m.items) ? m.items : [];
+    sortedInv = [...inv].sort((a, b) => b.priceRub - a.priceRub);
     const live = new Set(inv.map(g => g.uid));       // проданные подарки уходят из профиля
     const list = pinned(), kept = list.filter(g => live.has(g.uid));
     if (kept.length !== list.length) { app.state.profile.pinnedGifts = kept; app.saveState(); }
@@ -6083,12 +6108,12 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
   function queue(kind,source_id,rarity){
     useOwner();if(!ready()||!source_id)return;
     events.push({kind,source_id:String(source_id),rarity:rarity||null});
-    if(events.length>3000)events=events.slice(-3000);
     persist();clearTimeout(flushTimer);flushTimer=setTimeout(flush,1200);
   }
+  let progressBackoffUntil=0;
   function flush(){
     useOwner();if(flushTask)return flushTask;
-    if(!ready()||!events.length)return Promise.resolve();
+    if(!ready()||!events.length||Date.now()<progressBackoffUntil)return Promise.resolve();
     flushTask=(async()=>{try{
       while(ready()&&events.length){
         const batchOwner=owner;
@@ -6115,12 +6140,18 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
         }
         await refresh();
       }
-    }catch(error){console.warn('Progress event sync:',error);setTimeout(flush,5000);}
+    }catch(error){
+      console.warn('Progress event sync:',error);
+      const rateLimited=/spin_rate_limit/.test(String(error?.message||''));
+      if(rateLimited)progressBackoffUntil=Date.now()+61000;
+      setTimeout(flush,rateLimited?61000:5000);
+    }
     finally{flushTask=null;}})();
     return flushTask;
   }
   const progress={
     get state(){return state;},refresh,flush,
+    get pendingCount(){useOwner();return events.length;},
     capacity(base){return Math.min(2500,Math.max(50,Number(base||50))+100*skillLevel('collector'));},
     autoRate(base){return Math.min(18,Math.max(1,Number(base||1))*(1+0.05*skillLevel('speed')));},
     saleRub(price){const base=Number(price||0)*(1+0.01*skillLevel('trade'));const fee=Math.max(0,Number(window.numixMarket?.settings?.system_fee_bps??1500)*(5-skillLevel('no_fee'))/5)/10000;return Math.floor(base*(1-fee));},
@@ -6242,12 +6273,31 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
   const logged = () => !!(supabaseClient && app._cloudReady && app.state.cloudUser?.id);
   const icon = key => ({spins:'fa-rotate',rare:'fa-gem',collection:'fa-box-archive',sales:'fa-cart-shopping',gifts:'fa-gift',activity:'fa-stopwatch',epic:'fa-crown'})[key] || 'fa-star';
   const money = obj => ['rub','usd','ton'].filter(k => Number(obj?.[k] || 0)).map(k => `${fmt(obj[k])} ${k==='rub'?'₽':k==='usd'?'$':'TON'}`).join(' · ') || '0 ₽';
-  let busy=false, questBusyKey=null, auctionCategory='all', questState=null, auctionRefresh=0, questRefresh=0;
+  const retryable = error => ['40P01','40001'].includes(String(error?.code||''))
+    || /deadlock detected|serialization failure|failed to fetch|networkerror/i.test(String(error?.message||error||''));
+  const playerError = (error, fallback) => {
+    const message=String(error?.message||error||'');
+    if(/save_revision_conflict/.test(message))return 'Прогресс изменился на другом устройстве. Обновите игру и попробуйте ещё раз.';
+    if(/item_not_owned|lot_unavailable|item_listed/.test(message))return 'Предмет уже недоступен. Обновите список.';
+    if(/insufficient_ton|insufficient_rub|insufficient_usd/.test(message))return 'Недостаточно средств для операции.';
+    if(/collection_full/.test(message))return 'Коллекция заполнена.';
+    if(/lot_price_changed/.test(message))return 'Цена лота изменилась. Обновите список.';
+    return fallback;
+  };
+  async function rpcRetry(name,args){
+    for(let attempt=0;attempt<3;attempt++){
+      try{const result=await supabaseClient.rpc(name,args);if(!result.error)return result.data;
+        if(!retryable(result.error)||attempt===2)throw result.error;
+      }catch(error){if(!retryable(error)||attempt===2)throw error;}
+      await new Promise(resolve=>setTimeout(resolve,80+Math.random()*120+attempt*100));
+    }
+  }
+  let busy=false, exchangeBusy=false, questBusyKey=null, auctionCategory='all', questState=null, auctionRefresh=0, questRefresh=0;
   let giftSeen=new Set();
   const market={settings:{system_fee_bps:1500,auction_fee_bps:300},
-    async loadSettings(){const {data,error}=await supabaseClient.rpc('numix_market_settings');if(!error&&data){this.settings=data;window.numixProgress?.refresh();}},
+    async loadSettings(){const {data,error}=await supabaseClient.rpc('numix_market_settings');if(!error&&data){const changed=JSON.stringify(this.settings)!==JSON.stringify(data);this.settings=data;if(changed)window.numixProgress?.refresh();}},
     autoPayout(price,currency){const levels=window.numixProgress?.state?.skills||{};const fee=Math.max(0,Number(this.settings.system_fee_bps)*(5-Number(levels.no_fee||0))/5)/10000;const value=Number(price||0)*(1+Number(levels.trade||0)/100)*(1-fee);return currency==='ton'?Math.round(value*100)/100:Math.floor(value);},
-    async syncBefore(){if(!logged())throw new Error('Войдите в аккаунт, чтобы совершать сделки.');await window.numixProgress?.flush();await app.saveUserDataToCloud(app.state.cloudUser.id);},
+    async syncBefore(){if(!logged())throw new Error('Войдите в аккаунт, чтобы совершать сделки.');await app.saveUserDataToCloud(app.state.cloudUser.id);},
     async reloadCloud(){const {profile,items}=await app.fetchCloudRecords(app.state.cloudUser.id);app.applyCloudData(profile,items);await window.numixProgress?.refresh();},
     async ask(title,body,action='Подтвердить'){
       $('numix-confirm-title').textContent=title;$('numix-confirm-body').textContent=body;
@@ -6256,20 +6306,33 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     },
     async systemSell(ids){
       if(busy||!ids.length)return false;busy=true;
+      const userId=app.state.cloudUser?.id;
+      let pending=null;
+      try{pending=JSON.parse(sessionStorage.getItem('numix_pending_sale')||'null');}catch(_){}
+      if(pending?.userId!==userId||JSON.stringify(pending?.ids)!==JSON.stringify(ids))pending=null;
+      let result=null;
       try{
-        await this.syncBefore();
-        const q=await supabaseClient.rpc('numix_system_sale_quote',{p_ids:ids});if(q.error)throw q.error;
-        const quote=q.data;
-        const summary=`Оценка: ${money(quote.gross)}\nКомиссия системы: ${fmt(quote.fee_percent)}% (${money(quote.fee)})\nВы получите: ${money(quote.payout)}`;
-        if(!await this.ask(ids.length===1?'Продать номер системе?':`Продать ${ids.length} номеров системе?`,summary,'Продать'))return false;
-        const requestId=crypto.randomUUID();
-        const r=await supabaseClient.rpc('numix_system_sell',{p_ids:ids,p_request_id:requestId,p_expected_revision:app._cloudRevision});
-        if(r.error)throw r.error;
-        await this.reloadCloud();app.showToast(`Продано. Получено ${money(r.data.payout)}. Комиссия ${money(r.data.fee)}.`,'success');
+        if(!pending){
+          await this.syncBefore();
+          const q=await supabaseClient.rpc('numix_system_sale_quote',{p_ids:ids});if(q.error)throw q.error;
+          const quote=q.data;
+          const summary=`Оценка: ${money(quote.gross)}\nКомиссия системы: ${fmt(quote.fee_percent)}% (${money(quote.fee)})\nВы получите: ${money(quote.payout)}`;
+          if(!await this.ask(ids.length===1?'Продать номер системе?':`Продать ${ids.length} номеров системе?`,summary,'Продать'))return false;
+          pending={userId,ids:[...ids],requestId:crypto.randomUUID(),revision:app._cloudRevision};
+          try{sessionStorage.setItem('numix_pending_sale',JSON.stringify(pending));}catch(_){}
+        }
+        result=await rpcRetry('numix_system_sell',{p_ids:pending.ids,p_request_id:pending.requestId,p_expected_revision:pending.revision});
+        try{await this.reloadCloud();sessionStorage.removeItem('numix_pending_sale');}
+        catch(error){console.error('Sale committed; refresh delayed:',error);}
+        app.showToast(`Продано. Получено ${money(result.payout)}. Комиссия ${money(result.fee)}.`,'success');
         quests.refresh();
         return true;
-      }catch(error){app.showToast(`Продажа не выполнена: ${error.message||error}`,'error');return false;}
-      finally{busy=false;}
+      }catch(error){
+        console.error('System sale:',error);
+        if(!retryable(error)){try{sessionStorage.removeItem('numix_pending_sale');}catch(_){}}
+        app.showToast(playerError(error,retryable(error)?'Не удалось подтвердить продажу. Повторите действие: запрос будет проверен без двойного начисления.':'Не удалось завершить продажу. Попробуйте ещё раз.'),'error');
+        return false;
+      }finally{busy=false;}
     },
     gifts(){try{return JSON.parse(localStorage.getItem('tg_gifts_roulette_v2')||'{}').inventory||[];}catch{return [];}}
   };
@@ -6317,19 +6380,19 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       if(!shown){const option=document.createElement('option');option.textContent='Нет подходящих предметов';option.value='';select.append(option);}
     },
     async list(){if(busy)return;const id=$('auction-item').value,kind=$('auction-item-kind').value,price=Number($('auction-price').value);if(!id||!Number.isFinite(price)||price<1)return app.showToast('Выберите предмет и укажите цену от 1 TON.','error');
-      busy=true;try{await market.syncBefore();await market.loadSettings();const fee=Math.round(price*Number(market.settings.auction_fee_bps)/100)/100;
+      busy=true;let committed=false;try{await market.syncBefore();await market.loadSettings();const fee=Math.round(price*Number(market.settings.auction_fee_bps)/100)/100;
         if(!await market.ask('Выставить лот?',`Цена: ${fmt(price)} TON\nКомиссия при продаже: ${fmt(fee)} TON\nВы получите: ${fmt(price-fee)} TON`,'Выставить'))return;
-        const r=await supabaseClient.rpc('numix_auction_list',{p_kind:kind,p_item_id:id,p_price:price,p_expected_revision:app._cloudRevision});if(r.error)throw r.error;
+        const r=await supabaseClient.rpc('numix_auction_list',{p_kind:kind,p_item_id:id,p_price:price,p_expected_revision:app._cloudRevision});if(r.error)throw r.error;committed=true;
         await market.reloadCloud();$('auction-form').classList.add('hidden');this.refresh();app.showToast('Лот выставлен на аукцион.','success');
-      }catch(error){app.showToast(`Не удалось выставить лот: ${error.message||error}`,'error');}finally{busy=false;}}
-    ,async buy(l){if(busy)return;busy=true;try{await market.syncBefore();if(!await market.ask('Купить предмет?',`Цена: ${fmt(l.price_ton)} TON\nПродавец: ${l.seller_name}\nПредмет перейдёт в вашу коллекцию или инвентарь.`,'Купить'))return;
-        const r=await supabaseClient.rpc('numix_auction_buy',{p_lot:l.id,p_expected_revision:app._cloudRevision,p_expected_price:l.price_ton});if(r.error)throw r.error;
+      }catch(error){console.error('numix_auction_list',error);app.showToast(committed?'Лот выставлен, но список пока не обновился.':'Не удалось выставить лот. Попробуйте ещё раз.',committed?'info':'error');}finally{busy=false;}}
+    ,async buy(l){if(busy)return;busy=true;let committed=false;try{await market.syncBefore();if(!await market.ask('Купить предмет?',`Цена: ${fmt(l.price_ton)} TON\nПродавец: ${l.seller_name}\nПредмет перейдёт в вашу коллекцию или инвентарь.`,'Купить'))return;
+        const r=await supabaseClient.rpc('numix_auction_buy',{p_lot:l.id,p_expected_revision:app._cloudRevision,p_expected_price:l.price_ton});if(r.error)throw r.error;committed=true;
         await market.reloadCloud();this.refresh();app.showToast('Покупка завершена. Предмет добавлен в ваш инвентарь.','success');
-      }catch(error){app.showToast(`Покупка не выполнена: ${error.message||error}`,'error');}finally{busy=false;}}
-    ,async cancel(l){if(busy)return;busy=true;try{await market.syncBefore();if(!await market.ask('Снять лот?',`Предмет вернётся в ваш инвентарь. Комиссия не взимается.`,'Снять'))return;
-        const r=await supabaseClient.rpc('numix_auction_cancel',{p_lot:l.id,p_expected_revision:app._cloudRevision});if(r.error)throw r.error;
+      }catch(error){console.error('numix_auction_buy',error);app.showToast(committed?'Покупка завершена, но инвентарь пока не обновился.':'Не удалось завершить покупку. Проверьте лот и баланс перед повтором.',committed?'info':'error');}finally{busy=false;}}
+    ,async cancel(l){if(busy)return;busy=true;let committed=false;try{await market.syncBefore();if(!await market.ask('Снять лот?',`Предмет вернётся в ваш инвентарь. Комиссия не взимается.`,'Снять'))return;
+        const r=await supabaseClient.rpc('numix_auction_cancel',{p_lot:l.id,p_expected_revision:app._cloudRevision});if(r.error)throw r.error;committed=true;
         await market.reloadCloud();this.refresh();app.showToast('Лот снят с продажи.','success');
-      }catch(error){app.showToast(`Не удалось снять лот: ${error.message||error}`,'error');}finally{busy=false;}}
+      }catch(error){console.error('numix_auction_cancel',error);app.showToast(committed?'Лот снят, но список пока не обновился.':'Не удалось снять лот. Проверьте его статус перед повтором.',committed?'info':'error');}finally{busy=false;}}
     ,async reprice(l){if(busy)return;const input=prompt('Новая цена в TON',String(l.price_ton));if(input===null)return;const price=Number(input);if(!Number.isFinite(price)||price<1)return app.showToast('Укажите цену от 1 TON.','error');
       busy=true;try{const r=await supabaseClient.rpc('numix_auction_reprice',{p_lot:l.id,p_price:price});if(r.error)throw r.error;this.refresh();app.showToast(`Цена обновлена. Комиссия при продаже ${fmt(r.data.fee_ton)} TON.`,'success');}
       catch(error){app.showToast(`Не удалось изменить цену: ${error.message||error}`,'error');}finally{busy=false;}}
@@ -6359,12 +6422,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       busy=true;questBusyKey=key;this.render();let awarded=null;
       try{
         await market.syncBefore();
-        for(let attempt=0;attempt<3;attempt++){
-          const r=await supabaseClient.rpc('numix_claim_daily_quest',{p_key:key,p_expected_revision:app._cloudRevision});
-          if(!r.error){awarded=r.data;break;}
-          if((r.error.code!=='40P01'&&!/deadlock detected/i.test(String(r.error.message||'')))||attempt===2)throw r.error;
-          await new Promise(resolve=>setTimeout(resolve,80+Math.random()*120+attempt*100));
-        }
+        awarded=await rpcRetry('numix_claim_daily_quest',{p_key:key,p_expected_revision:app._cloudRevision});
         if(questState){
           if(key==='bonus')questState.bonus_claimed=true;
           else{const entry=questState.quests?.find(q=>q.key===key);if(entry&&!entry.claimed){entry.claimed=true;questState.claimed_count=Number(questState.claimed_count||0)+1;}}
@@ -6373,7 +6431,15 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
         try{await market.reloadCloud();await this.refresh();}
         catch(error){console.warn('Reward granted; UI refresh delayed:',error);}
         app.showToast(`Награда получена! ${fmt(awarded.rub)} ₽ и ${fmt(awarded.xp)} XP.`,'success');
-      }catch(error){app.showToast(`Награда не получена: ${error.message||error}`,'error');}
+      }catch(error){
+        console.error('Quest claim:',error);
+        try{
+          await this.refresh();
+          const claimed=key==='bonus'?questState?.bonus_claimed:questState?.quests?.find(q=>q.key===key)?.claimed;
+          if(claimed){await market.reloadCloud();app.showToast('Награда получена!','success');return;}
+        }catch(refreshError){console.warn('Quest status refresh:',refreshError);}
+        app.showToast(playerError(error,'Не удалось получить награду. Попробуйте ещё раз.'),'error');
+      }
       finally{busy=false;questBusyKey=null;this.render();}
     }
   };
@@ -6394,8 +6460,40 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     app.renderQuestsUI=()=>{if(app.activeTab==='quests')quests.refresh();else quests.render();};
     app.executeSellItem=id=>market.systemSell([id]);
     app.executeBulkSell=()=>market.systemSell([...app.selectedMarketIds]);
+    const oldExchange=app.exchangeCurrency.bind(app);
+    app.exchangeCurrency=async function(kind){
+      if(!this.state.cloudUser?.id)return oldExchange(kind);
+      if(exchangeBusy)return;
+      if(!this._cloudReady)return this.showToast('Сначала завершите синхронизацию аккаунта.','error');
+      const quote=this.exchangeQuote(kind);
+      if(!quote.affordable)return this.showToast('Проверьте сумму и баланс.','error');
+      exchangeBusy=true;
+      let pending=null;
+      let exchangeApplied=false;
+      try{pending=JSON.parse(sessionStorage.getItem('numix_pending_exchange')||'null');}catch(_){}
+      if(pending?.userId!==this.state.cloudUser.id||pending?.kind!==kind||pending?.amount!==quote.amount)pending=null;
+      try{
+        if(!pending){
+          await market.syncBefore();
+          pending={userId:this.state.cloudUser.id,kind,amount:quote.amount,requestId:crypto.randomUUID(),revision:this._cloudRevision};
+          try{sessionStorage.setItem('numix_pending_exchange',JSON.stringify(pending));}catch(_){}
+        }
+        await rpcRetry('numix_exchange_currency',{p_kind:kind,p_amount:pending.amount,
+          p_request_id:pending.requestId,p_expected_revision:pending.revision});
+        exchangeApplied=true;
+        await market.reloadCloud();
+        try{sessionStorage.removeItem('numix_pending_exchange');}catch(_){}
+        document.getElementById(kind==='usd'?'exchange-usd-amount':'exchange-ton-amount').value='';
+        this.renderExchangeUI();
+        this.showToast(`Обмен завершён: +${quote.amount.toLocaleString('ru-RU')} ${kind==='usd'?'$':'TON'}.`,'success');
+      }catch(error){
+        console.error('Currency exchange:',error);
+        if(exchangeApplied){this.showToast('Обмен проведён, но баланс пока не обновился. Повторите действие для проверки без повторного списания.','info');return;}
+        if(!retryable(error)&&!/save_revision_conflict/.test(String(error?.message||''))){try{sessionStorage.removeItem('numix_pending_exchange');}catch(_){}}
+        this.showToast(playerError(error,'Не удалось завершить обмен. Попробуйте ещё раз.'),'error');
+      }finally{exchangeBusy=false;this.renderExchangeUI();}
+    };
     app.sellCurrentDrop=async function(){if(this.isRevealing||!this.currentDrop)return;const id=this.currentDrop.id;if(await this.executeSellItem(id)){this.currentDrop=null;$('drop-result-card').classList.add('hidden');$('prompt-tap-here').classList.remove('hidden');}};
-    const oldSwitch=app.switchTab.bind(app);app.switchTab=function(tab){oldSwitch(tab);if(tab==='auction')auction.refresh();if(tab==='quests')quests.refresh();};
     const oldAdmin=app.toggleAdminPanelModal.bind(app);app.toggleAdminPanelModal=function(){oldAdmin();$('admin-system-fee').value=Number(market.settings.system_fee_bps)/100;$('admin-auction-fee').value=Number(market.settings.auction_fee_bps)/100;};
     const oldLogin=app.handleSuccessfulLogin.bind(app);app.handleSuccessfulLogin=async function(...args){const result=await oldLogin(...args);await quests.refresh();try{giftSeen=new Set((JSON.parse(localStorage.getItem('tg_gifts_roulette_v2')||'{}').history||[]).map(h=>h.id).filter(Boolean));}catch{}return result;};
     quests.refresh();setInterval(()=>quests.tick(),30000);setInterval(()=>market.loadSettings().catch(console.warn),60000);
