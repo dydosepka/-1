@@ -6242,7 +6242,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
   const logged = () => !!(supabaseClient && app._cloudReady && app.state.cloudUser?.id);
   const icon = key => ({spins:'fa-rotate',rare:'fa-gem',collection:'fa-box-archive',sales:'fa-cart-shopping',gifts:'fa-gift',activity:'fa-stopwatch',epic:'fa-crown'})[key] || 'fa-star';
   const money = obj => ['rub','usd','ton'].filter(k => Number(obj?.[k] || 0)).map(k => `${fmt(obj[k])} ${k==='rub'?'₽':k==='usd'?'$':'TON'}`).join(' · ') || '0 ₽';
-  let busy=false, auctionCategory='all', questState=null, auctionRefresh=0, questRefresh=0;
+  let busy=false, questBusyKey=null, auctionCategory='all', questState=null, auctionRefresh=0, questRefresh=0;
   let giftSeen=new Set();
   const market={settings:{system_fee_bps:1500,auction_fee_bps:300},
     async loadSettings(){const {data,error}=await supabaseClient.rpc('numix_market_settings');if(!error&&data){this.settings=data;window.numixProgress?.refresh();}},
@@ -6348,16 +6348,34 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       for(const q of list){const current=Math.min(Number(q.progress||0),Number(q.target||1)),done=current>=q.target;if(done)completed++;
         const card=document.createElement('article');card.className='glass-card p-4 rounded-2xl space-y-2';
         card.innerHTML=`<div class="flex items-start justify-between gap-2"><div><h3 class="text-sm font-bold text-white"><i class="fa-solid ${icon(q.key)} text-emerald-400 mr-1"></i>${esc(q.title)}</h3><p class="text-xs text-slate-400 mt-1">${fmt(current)} / ${fmt(q.target)}${q.key==='activity'?' сек':''}</p></div><span class="text-xs text-amber-300 shrink-0">${fmt(q.rub)} ₽ · ${fmt(q.xp)} XP</span></div><div class="h-2 rounded-full bg-slate-800 overflow-hidden"><div class="h-full bg-emerald-400" style="width:${Math.min(100,current/q.target*100)}%"></div></div>`;
-        const button=document.createElement('button');button.type='button';button.className='w-full py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold disabled:opacity-40';button.textContent=q.claimed?'Награда получена':done?'Забрать награду':'Выполняется';button.disabled=!done||q.claimed;button.onclick=()=>this.claim(q.key);card.append(button);container.append(card);}
+        const button=document.createElement('button');button.type='button';button.className='w-full py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold disabled:opacity-40';button.textContent=questBusyKey===q.key?'Получение награды...':q.claimed?'Награда получена':done?'Забрать награду':'Выполняется';button.disabled=!done||q.claimed||!!questBusyKey;button.onclick=()=>this.claim(q.key);card.append(button);container.append(card);}
       $('quests-total-progress').textContent=`${completed} / 7`;
       $('menu-quests-sub').textContent=`${completed} / 7 выполнено`;
-      const claimed=Number(questState?.claimed_count||0);$('quest-bonus').disabled=claimed!==7||questState?.bonus_claimed;
-      $('quest-bonus').textContent=questState?.bonus_claimed?'Бонус получен':'Забрать бонус · 100 000 ₽ и 100 XP';
+      const claimed=Number(questState?.claimed_count||0);$('quest-bonus').disabled=claimed!==7||questState?.bonus_claimed||!!questBusyKey;
+      $('quest-bonus').textContent=questBusyKey==='bonus'?'Получение награды...':questState?.bonus_claimed?'Бонус получен':'Забрать бонус · 100 000 ₽ и 100 XP';
       this.tick();},
     tick(){if(!questState?.reset_at)return;const left=Math.max(0,new Date(questState.reset_at)-Date.now());$('daily-quests-reset-timer').textContent=`Обновление через ${Math.floor(left/3600000)} ч. ${Math.floor(left%3600000/60000)} мин.`;if(!left)this.refresh();},
-    async claim(key){if(busy||!logged())return;busy=true;try{await market.syncBefore();const r=await supabaseClient.rpc('numix_claim_daily_quest',{p_key:key,p_expected_revision:app._cloudRevision});if(r.error)throw r.error;
-        await market.reloadCloud();await this.refresh();app.showToast(`Награда получена: ${fmt(r.data.rub)} ₽ и ${fmt(r.data.xp)} XP!`,'success');
-      }catch(error){app.showToast(`Награда не получена: ${error.message||error}`,'error');}finally{busy=false;}}
+    async claim(key){if(busy||questBusyKey||!logged())return;
+      busy=true;questBusyKey=key;this.render();let awarded=null;
+      try{
+        await market.syncBefore();
+        for(let attempt=0;attempt<3;attempt++){
+          const r=await supabaseClient.rpc('numix_claim_daily_quest',{p_key:key,p_expected_revision:app._cloudRevision});
+          if(!r.error){awarded=r.data;break;}
+          if((r.error.code!=='40P01'&&!/deadlock detected/i.test(String(r.error.message||'')))||attempt===2)throw r.error;
+          await new Promise(resolve=>setTimeout(resolve,80+Math.random()*120+attempt*100));
+        }
+        if(questState){
+          if(key==='bonus')questState.bonus_claimed=true;
+          else{const entry=questState.quests?.find(q=>q.key===key);if(entry&&!entry.claimed){entry.claimed=true;questState.claimed_count=Number(questState.claimed_count||0)+1;}}
+        }
+        this.render();
+        try{await market.reloadCloud();await this.refresh();}
+        catch(error){console.warn('Reward granted; UI refresh delayed:',error);}
+        app.showToast(`Награда получена! ${fmt(awarded.rub)} ₽ и ${fmt(awarded.xp)} XP.`,'success');
+      }catch(error){app.showToast(`Награда не получена: ${error.message||error}`,'error');}
+      finally{busy=false;questBusyKey=null;this.render();}
+    }
   };
   window.numixQuests=quests;
 
