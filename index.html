@@ -5998,22 +5998,35 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     let clientId;
     try { clientId=sessionStorage.getItem(CLIENT_KEY); if (!clientId) { clientId=newId(); sessionStorage.setItem(CLIENT_KEY,clientId); } }
     catch (_) { clientId=newId(); }
-    let lastInteraction=0,lastSentInteraction=0,lastPing=0,inFlight=false,focused=true;
+    let lastInteraction=0,lastSentInteraction=0,lastPing=0,inFlight=false,focused=true,pingTask=null,leaveTask=null;
     const canSend=() => !!(app._cloudReady && app.state.cloudUser?.id && !document.hidden && focused);
     async function ping() {
-      if (!canSend() || Date.now()-lastInteraction>60000 || inFlight || Date.now()-lastPing<9000) return;
+      if (!canSend() || Date.now()-lastInteraction>60000 || inFlight || leaveTask || Date.now()-lastPing<9000) return;
       inFlight=true; lastPing=Date.now();
       const interacted=lastInteraction>lastSentInteraction;
-      if (interacted) lastSentInteraction=lastInteraction;
-      try { await supabaseClient.rpc('numix_activity_ping',{p_client_id:clientId,p_interaction:interacted}); }
+      const interactionAt=lastInteraction;
+      try {
+        pingTask=supabaseClient.rpc('numix_activity_ping',{p_client_id:clientId,p_interaction:interacted});
+        const {error}=await pingTask;
+        if (error) throw error;
+        if (interacted) lastSentInteraction=interactionAt;
+      }
       catch (error) { console.warn('Activity ping:',error); }
-      finally { inFlight=false; }
+      finally { pingTask=null; inFlight=false; }
     }
     function interaction() { if (!document.hidden) { lastInteraction=Date.now(); ping(); } }
-    async function leave() {
+    function leave() {
       if (!app._cloudReady || !app.state.cloudUser?.id) return;
-      try { await supabaseClient.rpc('numix_activity_leave',{p_client_id:clientId}); }
-      catch (_) {}
+      if (leaveTask) return leaveTask;
+      leaveTask=(async()=>{
+        try {
+          if (pingTask) { try { await pingTask; } catch (_) {} }
+          const {error}=await supabaseClient.rpc('numix_activity_leave',{p_client_id:clientId});
+          if (error) console.warn('Activity leave:',error);
+        } catch (error) { console.warn('Activity leave:',error); }
+        finally { leaveTask=null; }
+      })();
+      return leaveTask;
     }
     for (const event of ['pointerdown','keydown','wheel','touchstart']) document.addEventListener(event,interaction,{passive:true,capture:true});
     const attachFrame=() => {
