@@ -6129,6 +6129,10 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     };
     const oldLogin=app.handleSuccessfulLogin.bind(app);
     app.handleSuccessfulLogin=async function(...args){const result=await oldLogin(...args);await refresh();return result;};
+    const oldApplyCloud=app.applyCloudData.bind(app);
+    app.applyCloudData=function(...args){const result=oldApplyCloud(...args);setTimeout(refresh,0);return result;};
+    const oldChooseLocal=app.chooseLocalProgress.bind(app);
+    app.chooseLocalProgress=async function(...args){const result=await oldChooseLocal(...args);await refresh();return result;};
     const oldLogout=app.cloudLogout.bind(app);
     app.cloudLogout=async function(...args){const result=await oldLogout(...args);state=null;owner=null;events=[];render();return result;};
     render();setTimeout(refresh,700);setInterval(()=>{if(ready()&&events.length)flush();},2500);
