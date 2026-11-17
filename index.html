@@ -5927,7 +5927,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     speed:['⚡','Скорость','Ускоряет автоматическую прокрутку в безопасных пределах.'],
     collector:['📦','Коллекционер','Добавляет места для хранения номеров.'],
     greater_luck:['✨','Большая удача','Усиливает только редкий компонент удачной прокрутки.'],
-    no_fee:['💸','Без комиссии','Снижает комиссию при продаже номеров игровой системе.']
+    no_fee:['💸','Без комиссии','Снижает комиссию при продаже телефонных номеров игровой системе. Прокачайте навык до максимума, чтобы продавать номера без потерь!']
   };
   const ORDER=Object.keys(LABELS);
   const el=id=>document.getElementById(id);
@@ -5973,7 +5973,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       const button=document.createElement('button');button.type='button';button.className='skill-buy';
       if(!ready()){button.textContent='Войдите в аккаунт';button.disabled=true;}
       else if(locked){button.textContent=`🔒 Откроется на ${unlock} уровне`;button.disabled=true;}
-      else if(current>=5){button.textContent='Максимальный уровень';button.disabled=true;}
+      else if(current>=5){button.textContent=key==='no_fee'?'Максимальный уровень — комиссия 0%':'Максимальный уровень';button.disabled=true;}
       else{button.textContent=`Улучшить — ${fmt(cost)} TON`;button.disabled=purchaseBusy;button.onclick=()=>progress.buy(key);}
       card.appendChild(button);holder.appendChild(card);
     }
@@ -6214,7 +6214,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
         const rarityKey=isGift?c.rarity:l.item?.rarityKey;
         const image=isGift&&c.image?`<img src="${esc(c.image)}" alt="${esc(title)}" class="w-16 h-16 object-contain mx-auto" loading="lazy">`:'';
         const card=document.createElement('article');card.className='glass-card rounded-2xl p-4 border border-slate-700/70 space-y-2 min-w-0';
-        card.innerHTML=`<div class="flex justify-between gap-2 text-[11px] text-slate-400"><span>${isGift?'🎁 Подарок':'☎️ Номер'} · ${esc(rarityKey||'')}</span><span>${esc(new Date(l.created_at).toLocaleString('ru-RU'))}</span></div>${image}<h3 class="font-bold text-white break-all">${esc(title)}${isGift&&l.item?.s?' #'+esc(l.item.s):''}</h3><p class="text-xs text-slate-400">${isGift?'':`${esc(l.item?.flag||'')} ${esc(l.item?.plan?.country||'')} · Код ${esc(l.item?.plan?.code||'—')} · Оценка ${fmt(l.item?.price)} ${l.item?.currency==='usd'?'$':l.item?.currency==='ton'?'TON':'₽'}`}</p><p class="text-xs text-slate-400">Продавец: ${esc(l.seller_name)} · ${esc(l.seller_id)}</p><div class="flex items-center justify-between gap-2 pt-1"><strong class="text-sky-300">${fmt(l.price_ton)} TON</strong><div class="flex gap-1"></div></div>`;
+        card.innerHTML=`<div class="flex justify-between gap-2 text-[11px] text-slate-400"><span>${l.status==='sold'?(l.is_buyer?'Куплено · ':'Продано · '):''}${isGift?'🎁 Подарок':'☎️ Номер'} · ${esc(rarityKey||'')}</span><span>${esc(new Date(l.created_at).toLocaleString('ru-RU'))}</span></div>${image}<h3 class="font-bold text-white break-all">${esc(title)}${isGift&&l.item?.s?' #'+esc(l.item.s):''}</h3><p class="text-xs text-slate-400">${isGift?'':`${esc(l.item?.flag||'')} ${esc(l.item?.plan?.country||'')} · Код ${esc(l.item?.plan?.code||'—')} · Оценка ${fmt(l.item?.price)} ${l.item?.currency==='usd'?'$':l.item?.currency==='ton'?'TON':'₽'}`}</p><p class="text-xs text-slate-400">Продавец: ${esc(l.seller_name)} · ${esc(l.seller_id)}</p><div class="flex items-center justify-between gap-2 pt-1"><strong class="text-sky-300">${fmt(l.price_ton)} TON</strong><div class="flex gap-1"></div></div>`;
         const actions=card.querySelector('div.flex.gap-1');
         const make=(label,fn,style)=>{const b=document.createElement('button');b.type='button';b.className=`px-3 py-2 rounded-xl text-xs font-bold ${style}`;b.textContent=label;b.onclick=fn;actions.append(b);};
         if(l.status==='active'&&l.is_mine){make('Цена',()=>this.reprice(l),'bg-slate-700 text-white');make('Снять',()=>this.cancel(l),'bg-rose-700 text-white');}
