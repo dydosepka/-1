@@ -566,7 +566,6 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
             <!-- BOTTOM BAR CONTROLS -->
             <div class="w-full flex items-center justify-end gap-2 pt-4 border-t border-slate-900 min-w-0">
-                <button id="btn-luck-spin" type="button" onclick="event.stopPropagation(); numixProgress.luckySpin()" class="hidden glass-panel px-3 py-3 rounded-2xl border border-emerald-500/40 font-bold text-xs text-emerald-300 disabled:opacity-50 min-w-0"><span id="luck-spin-label">🍀 Удача</span></button>
                 <!-- Auto Clicker Toggle Button -->
                 <button id="btn-auto-click" onclick="event.stopPropagation(); app.toggleAutoClicker()" class="glass-panel px-3 py-3 rounded-2xl border border-slate-800/80 font-bold text-xs text-slate-300 hover:text-white transition active:scale-95 flex items-center gap-2 min-w-0">
                     <i class="fa-solid fa-bolt text-amber-400"></i>
@@ -3197,8 +3196,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 this.longPressPointers.delete(pointerId);
             }
 
-            handleTapToOpen() {
-                if (this.isRevealing) return;
+            async handleTapToOpen() {
+                if (this.isRevealing || this._spinPreparing || this.activeTab !== 'generator' || document.hidden) return;
 
                 const maxCap = window.numixProgress?.capacity(this.state.upgrades.maxCapacity || 50) || this.state.upgrades.maxCapacity || 50;
                 if (this.state.collection.length >= maxCap) {
@@ -3214,10 +3213,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     return;
                 }
 
-                this.playTapFeedback();
-                this.state.balance -= cost;
-                const item = NumberGenerator.generate();
-                window.numixProgress?.recordSpin(item,'spin_manual');
+                this._spinPreparing = true;
+                try {
+                    const item = await window.numixProgress?.prepareLuckyItem() || NumberGenerator.generate();
+                    if (this.activeTab !== 'generator' || document.hidden || this.isRevealing) return;
+                    if (this.state.balance < cost || this.state.collection.length >= maxCap) return;
+                    this.playTapFeedback();
+                    this.state.balance -= cost;
+                    window.numixProgress?.recordSpin(item,'spin_manual');
 
                 if (['legendary', 'mythic', 'ultra'].includes(item.rarityKey)) {
                     this.state.quests.legendaryDropCount = Math.min(2, this.state.quests.legendaryDropCount + 1);
@@ -3225,8 +3228,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
                 this.currentDrop = item;
                 this.state.collection.unshift(item);
-                if (item.rarityKey !== 'black' && this.shouldAutoSell(item)) { this.autoSellItem(item); this.currentDrop = null; this.renderInstantDrop(item); return; }
+                if (item.rarityKey !== 'black' && this.shouldAutoSell(item)) {
+                    this.autoSellItem(item); this.currentDrop = null; this.renderInstantDrop(item);
+                    window.numixProgress?.completeLuckyItem(item);
+                    window.numixProgress?.showLuckyResult(item);
+                    return;
+                }
                 this.saveState();
+                window.numixProgress?.completeLuckyItem(item);
                 this.updateUIHeader();
 
                 if (item.rarityKey === 'black') {
@@ -3236,6 +3245,11 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 } else {
                     this.renderInstantDrop(item);
                 }
+                window.numixProgress?.showLuckyResult(item);
+                } catch (error) {
+                    console.error('Number spin:', error);
+                    this.showToast('Не удалось подготовить прокрутку. Попробуйте ещё раз.', 'error');
+                } finally { this._spinPreparing = false; }
             }
 
             countryLabel(item) {
@@ -3434,7 +3448,11 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 // Run in small batches with fractional pacing to respect the selected clicks/second.
                 let clickAccumulator = 0;
                 let lastSave = 0;
-                this.autoClickerInterval = setInterval(() => {
+                let spinTickBusy = false;
+                const loopToken = Symbol('auto-spin');
+                this._autoLoopToken = loopToken;
+                this.autoClickerInterval = setInterval(async () => {
+                    if (spinTickBusy || this._spinPreparing) return;
                     if (!this.isAutoClickerEnabled || this.isRevealing || this.activeTab !== 'generator' || document.hidden) {
                         this.stopAutoClicker();
                         return;
@@ -3457,10 +3475,19 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                         this.showToast(available <= 0 ? `Коллекция заполнена (${maxCap} слотов)!` : 'Недостаточно средств для прокрутки', 'error');
                         return;
                     }
+                    spinTickBusy = true;
+                    this._spinPreparing = true;
+                    try {
+                    const luckyItem = await window.numixProgress?.prepareLuckyItem();
+                    if (!this.isAutoClickerEnabled || this._autoLoopToken !== loopToken || this.isRevealing ||
+                        this.activeTab !== 'generator' || document.hidden) return;
+                    if (this.state.collection.length >= maxCap || this.state.balance < 1500) {
+                        this.stopAutoClicker(); return;
+                    }
                     let lastItem = null;
                     for (let i = 0; i < batch; i++) {
+                        lastItem = luckyItem || NumberGenerator.generate();
                         this.state.balance -= 1500;
-                        lastItem = NumberGenerator.generate();
                         window.numixProgress?.recordSpin(lastItem,'spin_auto');
                         if (['legendary', 'mythic', 'ultra'].includes(lastItem.rarityKey)) this.state.quests.legendaryDropCount = Math.min(2, this.state.quests.legendaryDropCount + 1);
                         this.state.collection.unshift(lastItem);
@@ -3485,7 +3512,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     }
                     this.updateUIHeader();
                     const now = Date.now();
-                    if (now - lastSave >= 500) { this.saveState(); lastSave = now; }
+                    if (luckyItem || now - lastSave >= 500) { this.saveState(); lastSave = now; }
+                    window.numixProgress?.completeLuckyItem(lastItem);
+                    window.numixProgress?.showLuckyResult(lastItem);
+                    } catch (error) {
+                        console.error('Automatic spin:', error);
+                        this.stopAutoClicker();
+                        this.showToast('Автопрокрутка остановлена: не удалось подтвердить удачу. Повторите запуск.', 'error');
+                    } finally { spinTickBusy = false; this._spinPreparing = false; }
                 }, 50);
                 btn.classList.add('bg-amber-500/20', 'border-amber-500');
                 document.getElementById('auto-click-text').textContent = 'Стоп Авто';
@@ -3494,6 +3528,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             stopAutoClicker() {
                 const wasRunning = this.isAutoClickerEnabled || !!this.autoClickerInterval;
                 this.isAutoClickerEnabled = false;
+                this._autoLoopToken = null;
                 if (this.autoClickerInterval) {
                     clearInterval(this.autoClickerInterval);
                     this.autoClickerInterval = null;
@@ -4930,8 +4965,6 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
   App.prototype.queueCloudSync = function () {
     if (!this._cloudReady || this._applyingCloud || !this.state.cloudUser?.id) return;
-    const hash = this.cloudPayloadHash(this.makeCloudPayload());
-    if (hash === this._lastCloudHash) return;
     this._cloudDirty = true;
     clearTimeout(this._cloudDebounce);
     this._cloudDebounce = setTimeout(() => {
@@ -5235,6 +5268,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
     if (error) {
       if (String(error.message || '').includes('save_revision_conflict')) {
         const remote = await this.fetchCloudRecords(userId);
+        if (remote.profile?.data && this.cloudPayloadHash(remote.profile.data) === hash) {
+          this._cloudRevision = Number(remote.profile.save_revision || 0);
+          this._lastCloudHash = hash;
+          try { localStorage.setItem(META_KEY, JSON.stringify({ userId, revision: this._cloudRevision, hash })); } catch (_) {}
+          this._cloudDirty = this.cloudPayloadHash(this.makeCloudPayload()) !== this._lastCloudHash;
+          if (this._cloudDirty) this.queueCloudSync();
+          return true;
+        }
         this.showCloudConflict(remote.profile, remote.items, userId);
       }
       throw error;
@@ -6051,7 +6092,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     const id=app.state.cloudUser?.id||null;
     if(id===owner)return;
     owner=id;events=[];
-    if(id)try{const saved=JSON.parse(localStorage.getItem(storageKey(id))||'[]');if(Array.isArray(saved))events=saved.slice(0,3000);}catch(_){}
+    if(id)try{const saved=JSON.parse(localStorage.getItem(storageKey(id))||'[]');if(Array.isArray(saved))events=saved;}catch(_){}
   }
   function render(){
     const d=state||DEFAULT,level=Number(d.level||1),needed=Math.max(1,Number(d.xp_needed||150)),inside=Number(d.xp_into_level||0);
@@ -6082,14 +6123,6 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       else if(current>=5){button.textContent=key==='no_fee'?'Максимальный уровень — комиссия 0%':'Максимальный уровень';button.disabled=true;}
       else{button.textContent=`Улучшить — ${fmt(cost)} TON`;button.disabled=purchaseBusy;button.onclick=()=>progress.buy(key);}
       card.appendChild(button);holder.appendChild(card);
-    }
-    const luckButton=el('btn-luck-spin'),luckLvl=skillLevel('luck');
-    luckButton.classList.toggle('hidden',!ready()||luckLvl<1);
-    if(luckLvl){
-      const interval=Number(config('luck').effects[luckLvl-1]||80);
-      const remaining=Math.max(0,interval-(Number(d.spins||0)-Number(d.last_luck_spin||0)));
-      el('luck-spin-label').textContent=remaining?`🍀 ${remaining} круток`:'🍀 Удача!';
-      luckButton.disabled=!!(remaining||luckBusy);
     }
   }
   async function refresh(){
@@ -6193,33 +6226,64 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
         app.showToast(message.includes('insufficient_ton')?'Недостаточно TON для улучшения.':message.includes('save_revision_conflict')?'Облачное сохранение изменилось. Обновите данные и попробуйте снова.':`Не удалось улучшить навык: ${message}`,'error');
       }finally{purchaseBusy=false;render();}
     },
-    async luckySpin(){
-      if(luckBusy||!ready()||app.activeTab!=='generator'||app.isRevealing)return;
-      if(Number(app.state.balance)<1500){app.showToast('Недостаточно рублей для прокрутки.','error');return;}
-      if(app.state.collection.length>=this.capacity(app.state.upgrades.maxCapacity||50)){app.showToast('Коллекция заполнена.','error');return;}
-      luckBusy=true;render();
+    async prepareLuckyItem(){
+      if(!ready())return null;
+      if(!state){await refresh();if(!state)throw new Error('luck_sync_pending');}
+      const key='numix_pending_lucky_spin',user=app.state.cloudUser.id;
+      let pending=null;try{pending=JSON.parse(sessionStorage.getItem(key)||'null');}catch(_){}
+      if(pending?.user!==user)pending=null;
+      if(pending&&app.state.collection.some(item=>item.id===pending.id)){
+        try{sessionStorage.removeItem(key);}catch(_){}pending=null;
+      }
+      const level=skillLevel('luck');
+      if(!pending&&level<1)return null;
+      const interval=Number(config('luck').effects[level-1]||80);
+      const queued=events.filter(e=>e.kind==='spin_manual'||e.kind==='spin_auto').length;
+      if(!pending&&Number(state.spins)-Number(state.last_luck_spin)+queued+1<interval)return null;
+      if(luckBusy)throw new Error('luck_sync_pending');
+      luckBusy=true;
       try{
-        await flush();await refresh();
-        const {data,error}=await supabaseClient.rpc('numix_luck_roll');if(error)throw error;
-        const rarityKey=String(data.rarity||'rare');
-        const rarity=RARITIES[rarityKey]||RARITIES.rare;
+        if(!pending){
+          await flush();
+          if(events.some(e=>e.kind==='spin_manual'||e.kind==='spin_auto'))throw new Error('luck_sync_pending');
+          await refresh();
+          if(Number(state.spins)-Number(state.last_luck_spin)+1<interval)return null;
+          pending={user,id:`num_${Date.now()}_${Math.random().toString(36).slice(2,9)}`};
+          try{sessionStorage.setItem(key,JSON.stringify(pending));}catch(_){}
+        }
+        if(pending.item)return pending.item;
+        let data;
+        for(let attempt=0;attempt<3;attempt++){
+          const {data:result,error}=await supabaseClient.rpc('numix_luck_roll_auto',{p_spin_id:pending.id});
+          if(!error){data=result;break;}
+          if(/luck_not_ready/.test(String(error.message||''))){
+            try{sessionStorage.removeItem(key);}catch(_){}return null;
+          }
+          if(attempt===2)throw error;
+          await new Promise(resolve=>setTimeout(resolve,80+Math.random()*120));
+        }
+        const rarityKey=String(data.rarity||'rare'),rarity=RARITIES[rarityKey]||RARITIES.rare;
         const planCode=rarityKey==='ultra'?'ULT':rarityKey==='mythic'?'MYTH':rarityKey==='legendary'?'TG_LEG':'RUS';
         const plan=PHONE_PLANS.find(x=>x.code===planCode);
         let digits=Array.from({length:plan.formatDigits},()=>Math.floor(Math.random()*10)).join('');
         if(rarityKey==='epic')digits=digits[0].repeat(4)+digits.slice(4);
         let index=0;const number=plan.pattern.replace(/X/g,()=>digits[index++]||'0');
-        const item={id:`num_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,plan,
-          formattedNumber:number,flag:plan.flag,rarityKey,rarity,
+        pending.item={id:pending.id,plan,formattedNumber:number,flag:plan.flag,rarityKey,rarity,
           price:Math.floor(rarity.minPrice+Math.random()*(rarity.maxPrice-rarity.minPrice+1)),
           currency:'rub',patternDesc:'🍀 Удачная прокрутка',isFavorite:false};
-        app.state.balance-=1500;app.state.collection.unshift(item);app.currentDrop=item;
-        if(['legendary','mythic'].includes(rarityKey))app.state.quests.legendaryDropCount=Math.min(2,app.state.quests.legendaryDropCount+1);
-        this.recordSpin(item,'spin_manual');app.saveState();app.updateUIHeader();app.renderInstantDrop(item);
-        const card=el('drop-result-card');card.classList.remove('skill-luck-flash');void card.offsetWidth;card.classList.add('skill-luck-flash');
-        app.showToast(`🍀 Удача! Выпал ${rarity.name.toLowerCase()} номер.`,'success');
-        await refresh();
-      }catch(error){app.showToast(`Удачная прокрутка недоступна: ${error?.message||error}`,'error');}
-      finally{luckBusy=false;render();}
+        try{sessionStorage.setItem(key,JSON.stringify(pending));}catch(_){}
+        return pending.item;
+      }finally{luckBusy=false;}
+    },
+    completeLuckyItem(item){
+      if(!item?.id)return;
+      try{const pending=JSON.parse(sessionStorage.getItem('numix_pending_lucky_spin')||'null');
+        if(pending?.id===item.id)sessionStorage.removeItem('numix_pending_lucky_spin');}catch(_){}
+    },
+    showLuckyResult(item){
+      if(item?.patternDesc!=='🍀 Удачная прокрутка')return;
+      const card=el('drop-result-card');card.classList.remove('skill-luck-flash');void card.offsetWidth;card.classList.add('skill-luck-flash');
+      app.showToast(`🍀 Удачная прокрутка! Выпал ${item.rarity.name.toLowerCase()} номер.`,'success');
     }
   };
   window.numixProgress=progress;
@@ -6274,8 +6338,8 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
   const logged = () => !!(supabaseClient && app._cloudReady && app.state.cloudUser?.id);
   const icon = key => ({spins:'fa-rotate',rare:'fa-gem',collection:'fa-box-archive',sales:'fa-cart-shopping',gifts:'fa-gift',activity:'fa-stopwatch',epic:'fa-crown'})[key] || 'fa-star';
   const money = obj => ['rub','usd','ton'].filter(k => Number(obj?.[k] || 0)).map(k => `${fmt(obj[k])} ${k==='rub'?'₽':k==='usd'?'$':'TON'}`).join(' · ') || '0 ₽';
-  const retryable = error => ['40P01','40001'].includes(String(error?.code||''))
-    || /deadlock detected|serialization failure|failed to fetch|networkerror/i.test(String(error?.message||error||''));
+  const retryable = error => ['40P01','40001','57014'].includes(String(error?.code||''))
+    || /deadlock detected|serialization failure|statement timeout|failed to fetch|networkerror/i.test(String(error?.message||error||''));
   const playerError = (error, fallback) => {
     const message=String(error?.message||error||'');
     if(/save_revision_conflict/.test(message))return 'Прогресс изменился на другом устройстве. Обновите игру и попробуйте ещё раз.';
@@ -6303,7 +6367,12 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       clearTimeout(app._cloudDebounce);
       const userId=app.state.cloudUser.id;
       for(let attempt=0;attempt<3;attempt++){
-        await app.saveUserDataToCloud(userId);
+        try{await app.saveUserDataToCloud(userId);}
+        catch(error){
+          if(!retryable(error)||attempt===2)throw error;
+          await new Promise(resolve=>setTimeout(resolve,80+Math.random()*120+attempt*100));
+          continue;
+        }
         if(userId!==app.state.cloudUser?.id)throw new Error('account_changed');
         if(app.cloudPayloadHash(app.makeCloudPayload())===app._lastCloudHash)return;
       }
@@ -6325,8 +6394,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       try{
         if(!pending){
           await this.syncBefore();
-          const q=await supabaseClient.rpc('numix_system_sale_quote',{p_ids:ids});if(q.error)throw q.error;
-          const quote=q.data;
+          const quote=await rpcRetry('numix_system_sale_quote',{p_ids:ids});
           const summary=`Оценка: ${money(quote.gross)}\nКомиссия системы: ${fmt(quote.fee_percent)}% (${money(quote.fee)})\nВы получите: ${money(quote.payout)}`;
           if(!await this.ask(ids.length===1?'Продать номер системе?':`Продать ${ids.length} номеров системе?`,summary,'Продать'))return false;
           await this.syncBefore();
@@ -6470,8 +6538,15 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     app.getAuctionLots=()=>[];
     const oldHeader=app.updateUIHeader.bind(app);app.updateUIHeader=function(){oldHeader();$('menu-quests-sub').textContent=`${(questState?.quests||[]).filter(q=>Number(q.progress)>=Number(q.target)).length} / 7 выполнено`;};
     app.renderQuestsUI=()=>{if(app.activeTab==='quests')quests.refresh();else quests.render();};
-    app.executeSellItem=id=>market.systemSell([id]);
-    app.executeBulkSell=()=>market.systemSell([...app.selectedMarketIds]);
+    const localSellItem=app.executeSellItem.bind(app);
+    const localBulkSell=app.executeBulkSell.bind(app);
+    app.executeSellItem=async id=>{
+      if(app.state.cloudUser?.id)return market.systemSell([id]);
+      const owned=app.state.collection.some(item=>item.id===id);
+      await localSellItem(id);
+      return owned&&!app.state.collection.some(item=>item.id===id);
+    };
+    app.executeBulkSell=()=>app.state.cloudUser?.id?market.systemSell([...app.selectedMarketIds]):localBulkSell();
     const oldExchange=app.exchangeCurrency.bind(app);
     app.exchangeCurrency=async function(kind){
       if(!this.state.cloudUser?.id)return oldExchange(kind);
