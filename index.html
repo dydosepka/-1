@@ -1282,13 +1282,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
     </div>
 
     <!-- CONFLICT MODAL: LOCAL VS CLOUD PROGRESS -->
-    <div id="conflictModal" class="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md items-center justify-center p-4" style="display:none;">
-        <div class="glass-card w-full max-w-md rounded-2xl p-5 border border-amber-500/40 shadow-2xl space-y-4">
-            <p class="text-sm font-bold text-white">Обнаружен разный прогресс на устройстве и в облаке. Какой вариант оставить?</p>
+    <div id="conflictModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md items-center justify-center p-4" style="display:none;z-index:2147483647;pointer-events:auto;padding-top:calc(16px + env(safe-area-inset-top, 0px));padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px))" role="dialog" aria-modal="true" aria-labelledby="conflictTitle">
+        <div class="glass-card w-full max-w-md rounded-2xl p-5 border border-amber-500/40 shadow-2xl space-y-4" style="position:relative;max-height:100%;overflow-y:auto;pointer-events:auto">
+            <p id="conflictTitle" class="text-sm font-bold text-white">Обнаружен разный прогресс на устройстве и в облаке. Какой вариант оставить?</p>
             <div class="conflict-buttons grid gap-2">
-                <button id="btnKeepLocal" class="w-full py-3 rounded-xl bg-cyan-600 text-slate-950 font-extrabold text-xs">Оставить этот (устройство: <span id="localBalanceVal">0</span> ₽)</button>
-                <button id="btnKeepCloud" class="w-full py-3 rounded-xl bg-slate-700 text-white font-extrabold text-xs">Загрузить из облака (<span id="cloudBalanceVal">0</span> ₽)</button>
+                <button id="btnKeepLocal" type="button" class="w-full py-3 rounded-xl bg-cyan-600 text-slate-950 font-extrabold text-xs" style="touch-action:manipulation;pointer-events:auto;min-height:48px">Оставить этот (устройство: <span id="localBalanceVal">0</span> ₽)</button>
+                <button id="btnKeepCloud" type="button" class="w-full py-3 rounded-xl bg-slate-700 text-white font-extrabold text-xs" style="touch-action:manipulation;pointer-events:auto;min-height:48px">Загрузить из облака (<span id="cloudBalanceVal">0</span> ₽)</button>
             </div>
+            <p id="conflictStatus" class="text-xs text-slate-300" role="status" aria-live="polite" hidden></p>
         </div>
     </div>
 
@@ -4823,8 +4824,21 @@ body[data-theme="blue"] { background:#0b1220 !important; }
         let app;
         window.onload = function() {
             app = new App();
-            document.getElementById('btnKeepLocal')?.addEventListener('click', () => app.chooseLocalProgress());
-            document.getElementById('btnKeepCloud')?.addEventListener('click', () => app.chooseCloudProgress());
+            for (const [id, action] of [['btnKeepLocal', () => app.chooseLocalProgress()], ['btnKeepCloud', () => app.chooseCloudProgress()]]) {
+                const button = document.getElementById(id);
+                if (!button) continue;
+                let lastTouch = 0;
+                button.addEventListener('touchend', event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    lastTouch = Date.now();
+                    action();
+                }, { passive: false });
+                button.addEventListener('click', event => {
+                    event.stopPropagation();
+                    if (Date.now() - lastTouch > 700) action();
+                });
+            }
             window.app = app;
             window.adminGiveRewardToPlayer = (...args) => app.adminGiveRewardToPlayer(...args);
             app.init();
@@ -5010,11 +5024,56 @@ body[data-theme="blue"] { background:#0b1220 !important; }
     return { payload, legacy, externalChanges };
   };
 
-  App.prototype.archiveConflict = function (label, value) {
-    try {
-      localStorage.setItem(`numix_recovery_${label}_${Date.now()}`, JSON.stringify(value));
-      return true;
-    } catch (error) { console.warn('Local conflict backup unavailable:', error); return false; }
+  App.prototype.archiveConflict = async function (label, value) {
+    const key = `numix_recovery_${label}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    if (typeof indexedDB !== 'undefined') {
+      const saved = await new Promise(resolve => {
+        let request;
+        try { request = indexedDB.open('numix_progress_recovery', 1); }
+        catch (_) { resolve(false); return; }
+        request.onupgradeneeded = () => request.result.createObjectStore('snapshots');
+        request.onerror = () => resolve(false);
+        request.onsuccess = () => {
+          const db = request.result;
+          let transaction;
+          try { transaction = db.transaction('snapshots', 'readwrite'); transaction.objectStore('snapshots').put({ label, savedAt: Date.now(), value }, key); }
+          catch (_) { db.close(); resolve(false); return; }
+          transaction.oncomplete = () => { db.close(); resolve(true); };
+          transaction.onerror = () => { db.close(); resolve(false); };
+          transaction.onabort = () => { db.close(); resolve(false); };
+        };
+      });
+      if (saved) return true;
+    }
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+    catch (error) { console.warn('Conflict backup unavailable:', error); return false; }
+  };
+
+  App.prototype.setConflictStatus = function (message = '', busy = false) {
+    this._conflictBusy = busy;
+    for (const id of ['btnKeepLocal', 'btnKeepCloud']) {
+      const button = document.getElementById(id);
+      if (button) button.disabled = busy;
+    }
+    const status = document.getElementById('conflictStatus');
+    if (status) { status.textContent = message; status.hidden = !message; }
+  };
+
+  App.prototype.canAutoResolveBalanceOnly = function (local, remote, meta, userId, revision) {
+    if (meta.userId !== userId || Number(meta.revision || 0) >= Number(revision || 0)) return false;
+    if (!local?.state || !remote?.state) return false;
+    const localRub = Number(local.state.balance), remoteRub = Number(remote.state.balance);
+    if (!Number.isFinite(localRub) || !Number.isFinite(remoteRub) || remoteRub < localRub || remoteRub - localRub > 10000) return false;
+    if (Number(local.state.usdBalance) !== Number(remote.state.usdBalance) || Number(local.state.tonBalance || 0) !== Number(remote.state.tonBalance || 0)) return false;
+    const withoutBalances = source => {
+      const value = copy(source);
+      delete value.state.balance;
+      delete value.state.usdBalance;
+      delete value.state.tonBalance;
+      if (value.roulette) delete value.roulette.balance;
+      return value;
+    };
+    return JSON.stringify(withoutBalances(local)) === JSON.stringify(withoutBalances(remote));
   };
 
   App.prototype.applyCloudData = function (profile, items = []) {
@@ -5077,7 +5136,10 @@ body[data-theme="blue"] { background:#0b1220 !important; }
     this._pendingCloudUserId = userId;
     document.getElementById('localBalanceVal').textContent = Number(this.state.balance || 0).toLocaleString('ru-RU');
     document.getElementById('cloudBalanceVal').textContent = Number(profile?.balance || 0).toLocaleString('ru-RU');
-    document.getElementById('conflictModal').style.display = 'flex';
+    const modal = document.getElementById('conflictModal');
+    if (modal.parentNode !== document.body) document.body.appendChild(modal);
+    this.setConflictStatus();
+    modal.style.display = 'flex';
     this.renderCloudUI();
   };
 
@@ -5107,6 +5169,9 @@ body[data-theme="blue"] { background:#0b1220 !important; }
         this._cloudReady = true;
         this._cloudDirty = true;
         await this.saveUserDataToCloud(user.id);
+      } else if (this.canAutoResolveBalanceOnly(this.makeCloudPayload(), remote.payload, meta, user.id, profile.save_revision)
+          && await this.archiveConflict('local', this.makeCloudPayload())) {
+        this.applyCloudData(profile, items);
       } else {
         this.showCloudConflict(profile, items, user.id);
       }
@@ -5202,16 +5267,19 @@ body[data-theme="blue"] { background:#0b1220 !important; }
   };
 
   App.prototype.chooseLocalProgress = async function () {
+    if (this._conflictBusy) return;
     const userId = this._pendingCloudUserId || this.state.cloudUser?.id;
     if (!userId) return;
+    this.setConflictStatus('Проверяем облако и сохраняем прогресс устройства…', true);
     try {
       const current = await this.fetchCloudRecords(userId);
+      if (!current.profile) throw new Error('Облачное сохранение недоступно. Повторите попытку при подключении к сети.');
       if (Number(current.profile?.save_revision || 0) !== Number(this._pendingCloudProfile?.save_revision || 0)
           || current.profile?.updated_at !== this._pendingCloudProfile?.updated_at) {
         this.showCloudConflict(current.profile, current.items, userId);
-        return this.showToast('Облако изменилось. Проверьте конфликт ещё раз.', 'error');
+        return this.setConflictStatus('Облако изменилось. Проверьте данные и выберите вариант ещё раз.');
       }
-      if (!this.archiveConflict('cloud', { profile: current.profile, items: current.items }))
+      if (!await this.archiveConflict('cloud', { profile: current.profile, items: current.items }))
         throw new Error('Недостаточно места для резервной копии облака. Данные не перезаписаны.');
       this._cloudRevision = Number(current.profile.save_revision || 0);
       this._cloudReady = true;
@@ -5219,17 +5287,30 @@ body[data-theme="blue"] { background:#0b1220 !important; }
       this._lastCloudHash = null;
       await this.saveUserDataToCloud(userId);
       document.getElementById('conflictModal').style.display = 'none';
+      this.setConflictStatus();
       this.showToast('Прогресс устройства сохранён в облаке.', 'success');
-    } catch (error) { console.error('Keep local:', error); this.showToast(error?.message || 'Не удалось сохранить прогресс устройства.', 'error'); }
+    } catch (error) { console.error('Keep local:', error); this._cloudReady = false; this.setConflictStatus(error?.message || 'Не удалось сохранить прогресс устройства. Повторите попытку.'); }
   };
 
-  App.prototype.chooseCloudProgress = function () {
-    if (!this._pendingCloudProfile) return;
-    if (!this.archiveConflict('local', this.makeCloudPayload()))
-      return this.showToast('Недостаточно места для резервной копии устройства. Данные не перезаписаны.', 'error');
-    this.applyCloudData(this._pendingCloudProfile, this._pendingCloudItems || []);
-    document.getElementById('conflictModal').style.display = 'none';
-    this.showToast('Весь прогресс загружен из облака.', 'success');
+  App.prototype.chooseCloudProgress = async function () {
+    if (this._conflictBusy || !this._pendingCloudProfile) return;
+    this.setConflictStatus('Проверяем облако и загружаем прогресс…', true);
+    try {
+      const userId = this._pendingCloudUserId || this.state.cloudUser?.id;
+      const current = await this.fetchCloudRecords(userId);
+      if (!current.profile) throw new Error('Облачное сохранение недоступно. Повторите попытку при подключении к сети.');
+      if (Number(current.profile.save_revision || 0) !== Number(this._pendingCloudProfile.save_revision || 0)
+          || current.profile.updated_at !== this._pendingCloudProfile.updated_at) {
+        this.showCloudConflict(current.profile, current.items, userId);
+        return this.setConflictStatus('Облако изменилось. Проверьте данные и выберите вариант ещё раз.');
+      }
+      if (!await this.archiveConflict('local', this.makeCloudPayload()))
+        throw new Error('Недостаточно места для резервной копии устройства. Данные не перезаписаны.');
+      this.applyCloudData(current.profile, current.items);
+      document.getElementById('conflictModal').style.display = 'none';
+      this.setConflictStatus();
+      this.showToast('Весь прогресс загружен из облака.', 'success');
+    } catch (error) { console.error('Keep cloud:', error); this.setConflictStatus(error?.message || 'Не удалось загрузить прогресс. Повторите попытку.'); }
   };
 
   App.prototype.cloudLogout = async function () {
