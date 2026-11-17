@@ -53,4 +53,3 @@ begin
   return query select v_revision, v_saved_at;
 end;
 $function$
-
