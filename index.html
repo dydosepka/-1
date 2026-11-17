@@ -420,6 +420,26 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 .market-sheet-close:focus-visible{outline:2px solid #67e8f9;outline-offset:2px}
 .market-sheet-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 16px 16px}
 </style>
+<style id="numix-ranking-style">
+#sec-ranking{background:#1f1f1f;overscroll-behavior:contain;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+.rank-panel{background:linear-gradient(145deg,#292c31,#22252a);border:1px solid #41464e;border-radius:18px}
+.rank-position{background:#25282d;border:1px solid #3e434b;border-radius:15px;padding:13px;min-width:0}
+.rank-category{flex:none;min-height:42px;padding:9px 14px;border:1px solid #41464e;border-radius:13px;background:#292c31;color:#cbd5e1;font-size:12px;font-weight:800;white-space:nowrap;transition:background .2s,border-color .2s}
+.rank-category[aria-selected="true"]{background:#3b414a;border-color:#8793a3;color:white}
+.rank-leader{background:#292c31;border:1px solid #41464e;border-radius:17px;padding:14px;min-width:0;cursor:pointer;transition:transform .2s,border-color .2s}
+.rank-leader:hover{transform:translateY(-2px);border-color:#697586}
+.rank-leader[data-place="1"]{border-color:#a88b45;background:linear-gradient(135deg,#383222,#292c31)}
+.rank-leader[data-place="2"]{border-color:#8793a3;background:linear-gradient(135deg,#33383d,#292c31)}
+.rank-leader[data-place="3"]{border-color:#a87856;background:linear-gradient(135deg,#392e29,#292c31)}
+.rank-leader[data-me="true"],.rank-list-row[data-me="true"]{box-shadow:inset 0 0 0 1px #67e8f9}
+.rank-avatar{width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:14px;background:#3b414a;border:1px solid #64748b;color:#fff;font-size:16px;font-weight:900}
+.rank-list-row{display:flex;align-items:center;gap:11px;width:100%;min-width:0;text-align:left;background:#292c31;border:1px solid #41464e;border-radius:15px;padding:10px 12px;cursor:pointer}
+.rank-list-row:hover{background:#34383f}
+.rank-overlay{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px calc(env(safe-area-inset-bottom,0px) + 14px);background:#000b}
+.rank-overlay[hidden]{display:none}
+.rank-dialog{width:min(100%,440px);max-height:100%;overflow-y:auto;background:#292c31;border:1px solid #525963;border-radius:20px;padding:20px;box-shadow:0 20px 70px #0009}
+@media(max-width:380px){.rank-position{padding:10px}.rank-leader{padding:11px}.rank-avatar{width:38px;height:38px}}
+</style>
 
 </head>
 <body class="min-h-screen flex flex-col justify-between select-none">
@@ -629,6 +649,11 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     <div class="menu-icon-tile text-fuchsia-300 group-hover:scale-105 transition"><i class="fa-solid fa-chart-pie"></i></div>
                     <h3 class="font-bold text-white text-sm">Шансы</h3>
                     <p class="text-[11px] text-fuchsia-200/80">Вероятность выпадения редкостей</p>
+                </div>
+                <div onclick="app.switchTab('ranking')" class="glass-card p-4 rounded-2xl cursor-pointer hover:border-amber-400/60 transition relative overflow-hidden group">
+                    <div class="menu-icon-tile text-amber-300 group-hover:scale-105 transition"><i class="fa-solid fa-trophy"></i></div>
+                    <h3 class="font-bold text-white text-sm">🏆 Рейтинг</h3>
+                    <p class="text-[11px] text-slate-400">Лучшие игроки NumixSpin</p>
                 </div>
             </div>
 
@@ -1057,7 +1082,32 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             </div>
             <iframe id="roulette-frame" title="Рулетка подарков" class="w-full flex-1 min-h-0 border-0" style="display:block;min-height:0;background:#1f1f1f;"></iframe>
         </section>
+        <section id="sec-ranking" class="hidden absolute inset-0 z-30 overflow-y-auto px-4 py-4 min-w-0">
+            <div class="max-w-3xl mx-auto space-y-4">
+                <div class="flex items-center justify-between gap-3">
+                    <div><h2 class="text-xl font-black text-white">🏆 Рейтинг игроков</h2><p class="text-xs text-slate-400">Соревнование аккаунтов NumixSpin</p></div>
+                    <button type="button" onclick="app.switchTab('menu')" aria-label="Закрыть рейтинг" class="w-10 h-10 shrink-0 rounded-xl rank-panel text-slate-300"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <button type="button" onclick="numixRanking.showRules()" class="rank-panel w-full min-h-10 px-4 py-2.5 text-left text-xs font-bold text-slate-200">ⓘ Как определяется рейтинг?</button>
+                <div class="rank-panel p-4 space-y-3">
+                    <div class="flex items-center justify-between"><h3 class="font-black text-white text-base">🏆 Мои позиции</h3><span id="rank-my-label" class="text-[11px] text-slate-400">Аккаунт</span></div>
+                    <div id="rank-my-grid" class="grid grid-cols-2 gap-2"></div>
+                    <div id="rank-my-activity" class="text-xs text-slate-300 border-t border-slate-600 pt-3"></div>
+                </div>
+                <div class="rank-panel px-4 py-3 flex items-center justify-between gap-3"><span class="text-xs font-bold text-slate-100">🟢 Сейчас играют</span><span id="rank-online" class="text-lg font-black text-emerald-300">—</span></div>
+                <div id="rank-categories" class="flex gap-2 overflow-x-auto pb-1" style="scrollbar-width:none" role="tablist" aria-label="Категории рейтинга"></div>
+                <div class="flex gap-2"><input id="rank-search" type="search" oninput="numixRanking.searchChanged()" placeholder="Поиск по никнейму или ID" class="min-w-0 flex-1 rank-panel px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-400"><button type="button" onclick="numixRanking.refresh(true)" class="rank-panel min-w-11 px-3 text-slate-200" aria-label="Обновить рейтинг"><i class="fa-solid fa-rotate"></i></button></div>
+                <p id="rank-status" class="text-[11px] text-slate-400" role="status"></p>
+                <div id="rank-top" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
+                <div id="rank-rest" class="space-y-2 max-h-[540px] overflow-y-auto pb-4"></div>
+            </div>
+        </section>
     </main>
+    <div id="rank-intro" class="rank-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="rank-intro-title">
+        <div class="rank-dialog space-y-4"><h2 id="rank-intro-title" class="text-lg font-black text-white">🏆 Добро пожаловать в рейтинг NumixSpin!</h2><p class="text-sm text-slate-300">Здесь собраны лучшие игроки, самые дорогие номера, крупнейшие состояния и самые активные участники игры.</p><div class="rank-panel p-3 space-y-2"><h3 class="text-sm font-bold text-amber-300">⚠️ Важная информация</h3><p class="text-xs leading-relaxed text-slate-300">В рейтинге участвуют только зарегистрированные пользователи, которые вошли в свой аккаунт. Если вы играете без регистрации, ваш прогресс не будет отображаться в таблицах лидеров. Чтобы попасть в рейтинг, зарегистрируйтесь или войдите в существующий аккаунт.</p></div><div class="grid gap-2"><button type="button" onclick="numixRanking.acceptIntro()" class="min-h-11 rounded-xl bg-amber-500 text-slate-950 text-xs font-black">🏆 Посмотреть рейтинг</button><button id="rank-intro-login" type="button" onclick="numixRanking.openLogin()" class="min-h-11 rounded-xl rank-panel text-white text-xs font-bold">👤 Войти / Зарегистрироваться</button></div></div>
+    </div>
+    <div id="rank-rules" class="rank-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="rank-rules-title" onclick="if(event.target===this) numixRanking.closeRules()"><div class="rank-dialog space-y-3"><div class="flex justify-between gap-2"><h2 id="rank-rules-title" class="text-base font-black text-white">Как определяется рейтинг?</h2><button type="button" onclick="numixRanking.closeRules()" aria-label="Закрыть правила" class="text-slate-300 text-lg">✕</button></div><ul class="space-y-2 text-xs text-slate-300 leading-relaxed"><li>👑 Лучший номер — самый дорогой номер игрока из маркета и избранного.</li><li>💰 Рубли — текущий рублёвый баланс.</li><li>💵 Доллары — текущий долларовый баланс.</li><li>💎 TON — текущий игровой TON-баланс.</li><li>⏱️ Активность — подтверждённое время использования игры.</li><li>🔥 Онлайн — число уникальных активных игроков.</li></ul><p class="text-xs text-amber-300">Незарегистрированные пользователи могут смотреть рейтинг, но не участвуют в нём.</p><button type="button" onclick="numixRanking.closeRules()" class="w-full min-h-10 rounded-xl bg-slate-700 text-xs font-bold text-white">Понятно</button></div></div>
+    <div id="rank-public-profile" class="rank-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="rank-profile-title" onclick="if(event.target===this) numixRanking.closeProfile()"><div class="rank-dialog space-y-3"><div class="flex justify-between gap-2"><h2 id="rank-profile-title" class="text-base font-black text-white">Профиль игрока</h2><button type="button" onclick="numixRanking.closeProfile()" aria-label="Закрыть профиль" class="text-slate-300 text-lg">✕</button></div><div id="rank-profile-content" class="space-y-2 text-xs text-slate-300"></div></div></div>
 
     <!-- BOTTOM MODE SWITCHER -->
     <nav id="mode-nav" class="shrink-0 grid grid-cols-2 glass-panel border-t border-slate-800/80 z-40" style="padding-bottom:env(safe-area-inset-bottom,0px)">
@@ -2296,7 +2346,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 if (this.isRevealing) return;
                 if (tabId !== 'generator') this.stopAutoClicker();
                 this.activeTab = tabId;
-                ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event', 'auction', 'chances', 'exchange'].forEach(s => {
+                ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event', 'auction', 'chances', 'exchange', 'ranking'].forEach(s => {
                     const el = document.getElementById(`sec-${s}`);
                     if (el) el.classList.add('hidden');
                 });
@@ -4748,7 +4798,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             document.addEventListener('pointerdown', function(event) {
                 if (!app || app.activeTab !== 'generator') return;
                 if (event.target.closest('#sec-generator')) return; // внутри генератора уже обрабатывается
-                if (event.target.closest('button, a, input, select, textarea, [role="dialog"], #sec-menu, #sec-market, #sec-exchange, #sec-profile, #sec-favorites, #sec-upgrades, #sec-quests, #sec-event')) return;
+                if (event.target.closest('button, a, input, select, textarea, [role="dialog"], #sec-menu, #sec-market, #sec-exchange, #sec-ranking, #sec-profile, #sec-favorites, #sec-upgrades, #sec-quests, #sec-event')) return;
                 if (event.pointerType === 'mouse' && event.button !== 0) return;
                 app.handleTapToOpen();
             }, { passive: true });
@@ -5561,7 +5611,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       if (tabId === 'roulette') {
         // Remember the currently open number-game screen before switching modes.
         if (this.activeTab && this.activeTab !== 'roulette') lastMain = this.activeTab;
-        ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event', 'auction'].forEach(name => {
+        ['generator', 'menu', 'profile', 'collection', 'market', 'favorites', 'quests', 'upgrades', 'event', 'auction', 'chances', 'exchange', 'ranking'].forEach(name => {
           const el = document.getElementById(`sec-${name}`);
           if (el) el.classList.add('hidden');
         });
@@ -5584,6 +5634,241 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
   }
   window.addEventListener('load', setup);
 })();
+</script>
+
+<script id="numix-leaderboard">
+(() => {
+  const CATEGORIES = [
+    ['best','👑 Лучший номер'],['rub','💰 Рубли'],['usd','💵 Доллары'],
+    ['ton','💎 TON'],['activity','⏱️ Активность']
+  ];
+  const INTRO_KEY = 'numix_ranking_intro_seen_v1';
+  const CLIENT_KEY = 'numix_activity_client_v1';
+  const fmt = value => Number(value || 0).toLocaleString('ru-RU');
+  const duration = seconds => {
+    const minutes = Math.floor(Number(seconds || 0) / 60);
+    return `${Math.floor(minutes / 60)} ч ${minutes % 60} мин`;
+  };
+  const el = id => document.getElementById(id);
+  const node = (tag, className, content) => {
+    const e = document.createElement(tag);
+    if (className) e.className = className;
+    if (content !== undefined) e.textContent = String(content);
+    return e;
+  };
+  const readSeen = () => { try { return localStorage.getItem(INTRO_KEY) === '1'; } catch (_) { return false; } };
+  const markSeen = () => { try { localStorage.setItem(INTRO_KEY,'1'); } catch (_) {} };
+  const newId = () => crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c => {
+    const n=crypto.getRandomValues(new Uint8Array(1))[0]&15;
+    return (c==='x' ? n : (n&3)|8).toString(16);
+  });
+  let category = 'best';
+  let searchTimer = null;
+  let refreshTimer = null;
+  let requestNumber = 0;
+  let lastRead = 0;
+  let lastKey = '';
+
+  const ranking = {
+    enter() {
+      this.renderCategories();
+      el('rank-intro-login').hidden = !!(app._cloudReady && app.state.cloudUser?.id);
+      if (!readSeen()) el('rank-intro').hidden = false;
+      this.renderPersonal();
+      this.refresh(true);
+    },
+    acceptIntro() { markSeen(); el('rank-intro').hidden = true; },
+    openLogin() {
+      markSeen(); el('rank-intro').hidden = true;
+      app.switchTab('menu');
+      if (el('settings-modal').classList.contains('hidden')) app.toggleSettingsModal();
+      app.showLoginPrompt();
+    },
+    showIntro() { el('rank-intro-login').hidden = !!(app._cloudReady && app.state.cloudUser?.id); el('rank-intro').hidden = false; },
+    showRules() { el('rank-rules').hidden = false; },
+    closeRules() { el('rank-rules').hidden = true; },
+    closeProfile() { el('rank-public-profile').hidden = true; },
+    renderCategories() {
+      const holder = el('rank-categories'); holder.replaceChildren();
+      for (const [key,label] of CATEGORIES) {
+        const button = node('button','rank-category',label);
+        button.type = 'button'; button.role = 'tab'; button.setAttribute('aria-selected',String(category===key));
+        button.onclick = () => { category=key; this.renderCategories(); this.refresh(true); };
+        holder.appendChild(button);
+      }
+    },
+    searchChanged() { clearTimeout(searchTimer); searchTimer=setTimeout(() => this.refresh(true),320); },
+    async renderPersonal() {
+      const grid = el('rank-my-grid'); grid.replaceChildren();
+      const loggedIn = !!(app._cloudReady && app.state.cloudUser?.id);
+      el('rank-my-label').textContent = loggedIn ? (app.state.profile?.userId || 'Мой аккаунт') : 'Гость';
+      let positions = null;
+      if (loggedIn && supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient.rpc('numix_my_positions');
+          if (!error) positions = data;
+        } catch (error) { console.warn('Ranking positions:',error); }
+      }
+      const cards = [['best','♕ Лучший номер'],['rub','◉ По рублям'],['usd','▣ По долларам'],['ton','◇ По TON']];
+      for (const [key,label] of cards) {
+        const card=node('div','rank-position');
+        card.appendChild(node('div','text-[11px] text-slate-400 font-bold',label));
+        card.appendChild(node('div','text-2xl font-black text-white mt-2',positions?.[key] ? `#${positions[key]}` : '—'));
+        grid.appendChild(card);
+      }
+      el('rank-my-activity').textContent = loggedIn
+        ? `⏱️ Активность: ${positions?.activity ? `#${positions.activity} — ` : ''}${duration(positions?.active_seconds)}`
+        : 'Войдите в аккаунт, чтобы участвовать в рейтинге.';
+      if (!loggedIn) {
+        const button=node('button','text-amber-300 font-bold text-xs mt-2','👤 Войти / Зарегистрироваться');
+        button.onclick=() => this.openLogin();
+        el('rank-my-activity').appendChild(node('br'));
+        el('rank-my-activity').appendChild(button);
+      }
+    },
+    async refresh(force=false) {
+      if (!supabaseClient) { el('rank-status').textContent='Рейтинг недоступен: нет соединения с Supabase.'; return; }
+      const query=el('rank-search').value.trim();
+      const key=`${category}:${query}`;
+      if (!force && key===lastKey && Date.now()-lastRead<25000) return;
+      const ownRequest=++requestNumber;
+      el('rank-status').textContent='Обновляем рейтинг…';
+      try {
+        if (app._cloudReady && app.state.cloudUser?.id && app.cloudPayloadHash(app.makeCloudPayload()) !== app._lastCloudHash)
+          await app.saveUserDataToCloud(app.state.cloudUser.id);
+      } catch (error) { console.warn('Ranking save before refresh:',error); }
+      let data, error;
+      try {
+        ({ data,error } = await supabaseClient.rpc('numix_leaderboard', {
+          p_category:category,p_search:query || null,p_limit:50
+        }));
+      } catch (failure) { error = failure; }
+      if (ownRequest!==requestNumber || app.activeTab!=='ranking') return;
+      if (error || !data) { el('rank-status').textContent='Не удалось загрузить рейтинг. Проверьте соединение.'; return; }
+      lastKey=key; lastRead=Date.now();
+      el('rank-online').textContent=fmt(data.online_count);
+      el('rank-status').textContent=`${fmt(data.total_players)} участников · обновлено ${new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}`;
+      this.renderRows(data);
+      this.renderPersonal();
+    },
+    rowValue(row) {
+      if (category==='activity') return duration(row.value);
+      if (category==='ton') return `${fmt(row.value)} TON`;
+      if (category==='usd') return `${fmt(row.value)} $`;
+      if (category==='best') return `${fmt(row.value)} ₽${['black','secret'].includes(row.rarity) ? ' экв.' : ''}`;
+      return `${fmt(row.value)} ₽`;
+    },
+    rowDetail(row) {
+      return category==='best' ? `${row.flag || ''} ${row.number || ''} · ${row.country || ''} · ${row.rarity || ''}` : row.player_id;
+    },
+    renderRows(data) {
+      const top=el('rank-top'),rest=el('rank-rest');
+      top.replaceChildren(); rest.replaceChildren();
+      const rows=Array.isArray(data.rows) ? data.rows : [];
+      if (!rows.length) { rest.appendChild(node('p','rank-panel p-5 text-center text-xs text-slate-400','Игроки не найдены.')); return; }
+      for (const row of rows) {
+        const me=Number(row.position)===Number(data.my_position) && data.my_position !== null;
+        if (row.position<=3) {
+          const card=node('button','rank-leader w-full text-left'); card.type='button';
+          card.dataset.place=String(row.position); card.dataset.me=String(me); card.onclick=() => this.openProfile(row.player_id);
+          const head=node('div','flex items-center gap-2 min-w-0');
+          const avatar=node('div','rank-avatar',(row.nickname || '?').trim().slice(0,1).toUpperCase());
+          const nameBox=node('div','min-w-0');
+          nameBox.appendChild(node('div','text-[10px] font-black text-amber-300',`#${row.position} ${['🥇','🥈','🥉'][row.position-1]}`));
+          nameBox.appendChild(node('div','font-bold text-sm text-white truncate',row.nickname));
+          head.append(avatar,nameBox); card.appendChild(head);
+          card.appendChild(node('div','text-lg font-black text-white mt-3 break-words',this.rowValue(row)));
+          card.appendChild(node('div','text-[11px] text-slate-400 mt-1 break-words',this.rowDetail(row)));
+          top.appendChild(card);
+        } else {
+          const line=node('button','rank-list-row'); line.type='button'; line.dataset.me=String(me);
+          line.onclick=() => this.openProfile(row.player_id);
+          line.appendChild(node('span','text-xs font-black text-slate-400 w-7 shrink-0',`#${row.position}`));
+          line.appendChild(node('span','rank-avatar',(row.nickname || '?').trim().slice(0,1).toUpperCase()));
+          const info=node('span','min-w-0 flex-1');
+          info.appendChild(node('span','block text-xs font-bold text-white truncate',row.nickname));
+          info.appendChild(node('span','block text-[10px] text-slate-400 truncate',this.rowDetail(row)));
+          line.appendChild(info);
+          line.appendChild(node('span','text-xs font-black text-white text-right max-w-[38%] break-words',this.rowValue(row)));
+          rest.appendChild(line);
+        }
+      }
+      if (!rest.children.length) rest.appendChild(node('p','text-center text-xs text-slate-500 py-3','Пока только ТОП-3.'));
+    },
+    async openProfile(playerId) {
+      const content=el('rank-profile-content'); content.textContent='Загружаем профиль…';
+      el('rank-public-profile').hidden=false;
+      let data,error;
+      try { ({ data,error }=await supabaseClient.rpc('numix_public_player',{p_player_id:playerId})); }
+      catch (failure) { error=failure; }
+      if (error || !data) { content.textContent='Профиль не найден.'; return; }
+      content.replaceChildren();
+      const header=node('div','flex items-center gap-3 pb-2 border-b border-slate-600');
+      header.appendChild(node('div','rank-avatar',(data.nickname || '?').trim().slice(0,1).toUpperCase()));
+      const title=node('div','min-w-0');
+      title.appendChild(node('div','font-black text-white text-base break-words',data.nickname));
+      title.appendChild(node('div','font-mono text-[11px] text-slate-400 break-all',data.player_id));
+      header.appendChild(title); content.appendChild(header);
+      for (const line of [
+        `👑 Лучший номер: ${data.best_number ? `${data.best_flag || ''} ${data.best_number} · ${data.best_country} · ${data.best_rarity}` : 'нет'}`,
+        `💰 Рубли: ${fmt(data.rub)} ₽`,`💵 Доллары: ${fmt(data.usd)} $`,
+        `💎 TON: ${fmt(data.ton)} TON`,`⏱️ Активность: ${duration(data.active_seconds)}`
+      ]) content.appendChild(node('div','rank-position text-xs text-slate-200',line));
+    }
+  };
+  window.numixRanking=ranking;
+
+  function setup() {
+    if (typeof app==='undefined' || !app) return setTimeout(setup,50);
+    const originalSwitch=app.switchTab.bind(app);
+    app.switchTab=function(tabId) {
+      originalSwitch(tabId);
+      if (tabId==='ranking' && this.activeTab==='ranking') ranking.enter();
+    };
+    const help=node('button','text-[11px] font-bold text-slate-400 mt-2','Открыть предупреждение о рейтинге');
+    help.type='button'; help.onclick=() => ranking.showIntro();
+    el('sec-ranking').querySelector('.max-w-3xl').appendChild(help);
+    refreshTimer=setInterval(() => { if (app.activeTab==='ranking' && !document.hidden) ranking.refresh(); },30000);
+    setupActivity();
+  }
+
+  function setupActivity() {
+    let clientId;
+    try { clientId=sessionStorage.getItem(CLIENT_KEY); if (!clientId) { clientId=newId(); sessionStorage.setItem(CLIENT_KEY,clientId); } }
+    catch (_) { clientId=newId(); }
+    let lastInteraction=0,lastSentInteraction=0,lastPing=0,inFlight=false,focused=true;
+    const canSend=() => !!(app._cloudReady && app.state.cloudUser?.id && !document.hidden && focused);
+    async function ping() {
+      if (!canSend() || Date.now()-lastInteraction>60000 || inFlight || Date.now()-lastPing<9000) return;
+      inFlight=true; lastPing=Date.now();
+      const interacted=lastInteraction>lastSentInteraction;
+      if (interacted) lastSentInteraction=lastInteraction;
+      try { await supabaseClient.rpc('numix_activity_ping',{p_client_id:clientId,p_interaction:interacted}); }
+      catch (error) { console.warn('Activity ping:',error); }
+      finally { inFlight=false; }
+    }
+    function interaction() { if (!document.hidden) { lastInteraction=Date.now(); ping(); } }
+    function leave() { if (app._cloudReady && app.state.cloudUser?.id) supabaseClient.rpc('numix_activity_leave',{p_client_id:clientId}).catch(()=>{}); }
+    for (const event of ['pointerdown','keydown','wheel','touchstart']) document.addEventListener(event,interaction,{passive:true,capture:true});
+    const attachFrame=() => {
+      try {
+        const doc=el('roulette-frame')?.contentDocument;
+        if (!doc || doc.__numixActivity) return;
+        doc.__numixActivity=true;
+        for (const event of ['pointerdown','keydown','wheel','touchstart']) doc.addEventListener(event,interaction,{passive:true,capture:true});
+      } catch (_) {}
+    };
+    el('roulette-frame')?.addEventListener('load',attachFrame);
+    attachFrame();
+    document.addEventListener('visibilitychange',() => { if (document.hidden) leave(); });
+    window.addEventListener('blur',() => { focused=false; leave(); });
+    window.addEventListener('focus',() => { focused=true; });
+    window.addEventListener('pagehide',leave);
+    setInterval(ping,15000);
+  }
+  window.addEventListener('load',setup);
+})();
+
 </script>
 
 <script id="basic-ui-protection">
