@@ -6229,11 +6229,11 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     async prepareLuckyItem(){
       if(!ready())return null;
       if(!state){await refresh();if(!state)throw new Error('luck_sync_pending');}
-      const key='numix_pending_lucky_spin',user=app.state.cloudUser.id;
-      let pending=null;try{pending=JSON.parse(sessionStorage.getItem(key)||'null');}catch(_){}
+      const user=app.state.cloudUser.id,key=`numix_pending_lucky_spin_${user}`;
+      let pending=null;try{pending=JSON.parse(localStorage.getItem(key)||'null');}catch(_){}
       if(pending?.user!==user)pending=null;
       if(pending&&app.state.collection.some(item=>item.id===pending.id)){
-        try{sessionStorage.removeItem(key);}catch(_){}pending=null;
+        try{localStorage.removeItem(key);}catch(_){}pending=null;
       }
       const level=skillLevel('luck');
       if(!pending&&level<1)return null;
@@ -6249,7 +6249,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
           await refresh();
           if(Number(state.spins)-Number(state.last_luck_spin)+1<interval)return null;
           pending={user,id:`num_${Date.now()}_${Math.random().toString(36).slice(2,9)}`};
-          try{sessionStorage.setItem(key,JSON.stringify(pending));}catch(_){}
+          try{localStorage.setItem(key,JSON.stringify(pending));}catch(_){}
         }
         if(pending.item)return pending.item;
         let data;
@@ -6257,7 +6257,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
           const {data:result,error}=await supabaseClient.rpc('numix_luck_roll_auto',{p_spin_id:pending.id});
           if(!error){data=result;break;}
           if(/luck_not_ready/.test(String(error.message||''))){
-            try{sessionStorage.removeItem(key);}catch(_){}return null;
+            try{localStorage.removeItem(key);}catch(_){}return null;
           }
           if(attempt===2)throw error;
           await new Promise(resolve=>setTimeout(resolve,80+Math.random()*120));
@@ -6271,14 +6271,15 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
         pending.item={id:pending.id,plan,formattedNumber:number,flag:plan.flag,rarityKey,rarity,
           price:Math.floor(rarity.minPrice+Math.random()*(rarity.maxPrice-rarity.minPrice+1)),
           currency:'rub',patternDesc:'🍀 Удачная прокрутка',isFavorite:false};
-        try{sessionStorage.setItem(key,JSON.stringify(pending));}catch(_){}
+        try{localStorage.setItem(key,JSON.stringify(pending));}catch(_){}
         return pending.item;
       }finally{luckBusy=false;}
     },
     completeLuckyItem(item){
       if(!item?.id)return;
-      try{const pending=JSON.parse(sessionStorage.getItem('numix_pending_lucky_spin')||'null');
-        if(pending?.id===item.id)sessionStorage.removeItem('numix_pending_lucky_spin');}catch(_){}
+      const key=`numix_pending_lucky_spin_${app.state.cloudUser?.id}`;
+      try{const pending=JSON.parse(localStorage.getItem(key)||'null');
+        if(pending?.id===item.id)localStorage.removeItem(key);}catch(_){}
     },
     showLuckyResult(item){
       if(item?.patternDesc!=='🍀 Удачная прокрутка')return;
