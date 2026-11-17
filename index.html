@@ -5324,9 +5324,12 @@ body[data-theme="blue"] { background:#0b1220 !important; }
     const form = this.adminNumberForm();
     if (!form.target || !form.planCode || !form.number)
       return this.adminNumberNotice('Укажите ID получателя, редкость, страну и номер.');
-    const { data, error } = await supabaseClient.rpc('numix_admin_number_preview', {
-      p_target: form.target, p_rarity: form.rarity, p_plan_code: form.planCode, p_number: form.number
-    });
+    let data, error;
+    try {
+      ({ data, error } = await supabaseClient.rpc('numix_admin_number_preview', {
+        p_target: form.target, p_rarity: form.rarity, p_plan_code: form.planCode, p_number: form.number
+      }));
+    } catch (requestError) { return this.adminNumberNotice('Не удалось проверить номер. Проверьте соединение.'); }
     if (error || !data?.ok) return this.adminNumberNotice(adminNumberError(error?.message?.match(/admin_required|recipient_not_found|recipient_id_ambiguous|invalid_rarity|invalid_number_plan|rarity_plan_mismatch|invalid_number_format/)?.[0] || data?.error || error?.message));
     const requestId = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
       const n = crypto.getRandomValues(new Uint8Array(1))[0] & 15;
