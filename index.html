@@ -5848,7 +5848,11 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       finally { inFlight=false; }
     }
     function interaction() { if (!document.hidden) { lastInteraction=Date.now(); ping(); } }
-    function leave() { if (app._cloudReady && app.state.cloudUser?.id) supabaseClient.rpc('numix_activity_leave',{p_client_id:clientId}).catch(()=>{}); }
+    async function leave() {
+      if (!app._cloudReady || !app.state.cloudUser?.id) return;
+      try { await supabaseClient.rpc('numix_activity_leave',{p_client_id:clientId}); }
+      catch (_) {}
+    }
     for (const event of ['pointerdown','keydown','wheel','touchstart']) document.addEventListener(event,interaction,{passive:true,capture:true});
     const attachFrame=() => {
       try {
@@ -5864,6 +5868,8 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     window.addEventListener('blur',() => { focused=false; leave(); });
     window.addEventListener('focus',() => { focused=true; });
     window.addEventListener('pagehide',leave);
+    const originalLogout=app.cloudLogout.bind(app);
+    app.cloudLogout=async function(...args) { await leave(); return originalLogout(...args); };
     setInterval(ping,15000);
   }
   window.addEventListener('load',setup);
