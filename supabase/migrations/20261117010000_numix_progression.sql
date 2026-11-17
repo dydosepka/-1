@@ -75,8 +75,9 @@ create table if not exists numix_private.luck_weights (
   max_weight numeric not null check (max_weight >= 0)
 );
 insert into numix_private.luck_weights(rarity_key,base_weight,boostable,max_weight) values
-  ('common',80,false,80),('uncommon',15,false,15),('rare',4.6,false,4.6),
-  ('epic',0.35,true,0.70),('legendary',0.045,true,0.09),('mythic',0.005,true,0.01)
+  ('common',79.997,false,79.997),('uncommon',15,false,15),('rare',4.6,false,4.6),
+  ('epic',0.35,true,0.70),('legendary',0.045,true,0.09),('mythic',0.005,true,0.01),
+  ('ultra',0.003,false,0.003)
 on conflict (rarity_key) do nothing;
 revoke all on numix_private.progression,numix_private.progress_events,numix_private.skill_levels,
   numix_private.skill_purchases,numix_private.level_history,numix_private.progress_config,
@@ -257,7 +258,7 @@ begin
   for v_row in select rarity_key,case when boostable then least(max_weight,base_weight+(v_mult-1)*base_weight*0.04)
       else base_weight end as weight from numix_private.luck_weights order by
       case rarity_key when 'common' then 1 when 'uncommon' then 2 when 'rare' then 3
-        when 'epic' then 4 when 'legendary' then 5 else 6 end loop
+      when 'epic' then 4 when 'legendary' then 5 when 'mythic' then 6 else 7 end loop
     v_running:=v_running+v_row.weight;
     if v_draw<v_running then v_rarity:=v_row.rarity_key; exit; end if;
   end loop;

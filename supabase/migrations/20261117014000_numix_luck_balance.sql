@@ -1,5 +1,7 @@
+insert into numix_private.luck_weights(rarity_key,base_weight,boostable,max_weight)
+values('ultra',0.003,false,0.003) on conflict(rarity_key) do nothing;
 update numix_private.luck_weights w set base_weight=v.base_weight,max_weight=v.max_weight from (values
-('common',80::numeric,80::numeric),('uncommon',15,15),('rare',4.6,4.6),
+('common',79.997::numeric,79.997::numeric),('uncommon',15,15),('rare',4.6,4.6),
 ('epic',0.35,0.70),('legendary',0.045,0.09),('mythic',0.005,0.01)
 ) v(rarity_key,base_weight,max_weight) where w.rarity_key=v.rarity_key;
 
@@ -24,7 +26,7 @@ begin
   for v_row in select rarity_key,case when boostable then least(max_weight,base_weight+(v_mult-1)*base_weight*0.04)
       else base_weight end as weight from numix_private.luck_weights order by
       case rarity_key when 'common' then 1 when 'uncommon' then 2 when 'rare' then 3
-        when 'epic' then 4 when 'legendary' then 5 else 6 end loop
+        when 'epic' then 4 when 'legendary' then 5 when 'mythic' then 6 else 7 end loop
     v_running:=v_running+v_row.weight;
     if v_draw<v_running then v_rarity:=v_row.rarity_key; exit; end if;
   end loop;

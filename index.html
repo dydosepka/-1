@@ -6082,8 +6082,10 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
         const {data,error}=await supabaseClient.rpc('numix_luck_roll');if(error)throw error;
         const rarityKey=String(data.rarity||'rare');
         const rarity=RARITIES[rarityKey]||RARITIES.rare;
-        const plan=PHONE_PLANS.find(x=>x.code==='RUS');
-        const digits=Array.from({length:9},()=>Math.floor(Math.random()*10)).join('');
+        const planCode=rarityKey==='ultra'?'ULT':rarityKey==='mythic'?'MYTH':rarityKey==='legendary'?'TG_LEG':'RUS';
+        const plan=PHONE_PLANS.find(x=>x.code===planCode);
+        let digits=Array.from({length:plan.formatDigits},()=>Math.floor(Math.random()*10)).join('');
+        if(rarityKey==='epic')digits=digits[0].repeat(4)+digits.slice(4);
         let index=0;const number=plan.pattern.replace(/X/g,()=>digits[index++]||'0');
         const item={id:`num_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,plan,
           formattedNumber:number,flag:plan.flag,rarityKey,rarity,
