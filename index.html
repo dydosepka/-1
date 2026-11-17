@@ -6298,7 +6298,17 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
   const market={settings:{system_fee_bps:1500,auction_fee_bps:300},
     async loadSettings(){const {data,error}=await supabaseClient.rpc('numix_market_settings');if(!error&&data){const changed=JSON.stringify(this.settings)!==JSON.stringify(data);this.settings=data;if(changed)window.numixProgress?.refresh();}},
     autoPayout(price,currency){const levels=window.numixProgress?.state?.skills||{};const fee=Math.max(0,Number(this.settings.system_fee_bps)*(5-Number(levels.no_fee||0))/5)/10000;const value=Number(price||0)*(1+Number(levels.trade||0)/100)*(1-fee);return currency==='ton'?Math.round(value*100)/100:Math.floor(value);},
-    async syncBefore(){if(!logged())throw new Error('Войдите в аккаунт, чтобы совершать сделки.');await app.saveUserDataToCloud(app.state.cloudUser.id);},
+    async syncBefore(){
+      if(!logged())throw new Error('Войдите в аккаунт, чтобы совершать сделки.');
+      clearTimeout(app._cloudDebounce);
+      const userId=app.state.cloudUser.id;
+      for(let attempt=0;attempt<3;attempt++){
+        await app.saveUserDataToCloud(userId);
+        if(userId!==app.state.cloudUser?.id)throw new Error('account_changed');
+        if(app.cloudPayloadHash(app.makeCloudPayload())===app._lastCloudHash)return;
+      }
+      throw new Error('cloud_save_not_current');
+    },
     async reloadCloud(){const {profile,items}=await app.fetchCloudRecords(app.state.cloudUser.id);app.applyCloudData(profile,items);await window.numixProgress?.refresh();},
     async ask(title,body,action='Подтвердить'){
       $('numix-confirm-title').textContent=title;$('numix-confirm-body').textContent=body;
@@ -6319,6 +6329,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
           const quote=q.data;
           const summary=`Оценка: ${money(quote.gross)}\nКомиссия системы: ${fmt(quote.fee_percent)}% (${money(quote.fee)})\nВы получите: ${money(quote.payout)}`;
           if(!await this.ask(ids.length===1?'Продать номер системе?':`Продать ${ids.length} номеров системе?`,summary,'Продать'))return false;
+          await this.syncBefore();
           pending={userId,ids:[...ids],requestId:crypto.randomUUID(),revision:app._cloudRevision};
           try{sessionStorage.setItem('numix_pending_sale',JSON.stringify(pending));}catch(_){}
         }
