@@ -3196,7 +3196,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             }
 
             handleTapToOpen() {
-                if (this.isRevealing || this.activeTab !== 'generator' || document.hidden) return;
+                if (this.isRevealing || this.isAutoClickerEnabled || this.activeTab !== 'generator' || document.hidden) return;
 
                 const maxCap = window.numixProgress?.capacity(this.state.upgrades.maxCapacity || 50) || this.state.upgrades.maxCapacity || 50;
                 if (this.state.collection.length >= maxCap) {
@@ -4968,11 +4968,17 @@ body[data-theme="blue"] { background:#0b1220 !important; }
   };
 
   App.prototype.fetchCloudRecords = async function (userId) {
-    const { data: profile, error: profileError } = await supabaseClient.from('profiles').select('*').eq('id', userId).maybeSingle();
+    const read = async query => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      try { return await (typeof query.abortSignal === 'function' ? query.abortSignal(controller.signal) : query); }
+      finally { clearTimeout(timer); }
+    };
+    const { data: profile, error: profileError } = await read(supabaseClient.from('profiles').select('*').eq('id', userId).maybeSingle());
     if (profileError) throw profileError;
     const items = [];
     for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabaseClient.from('user_items').select('*').eq('user_id', userId).order('id').range(from, from + 999);
+      const { data, error } = await read(supabaseClient.from('user_items').select('*').eq('user_id', userId).order('id').range(from, from + 999));
       if (error) throw error;
       items.push(...(data || []));
       if (!data || data.length < 1000) break;
@@ -5039,19 +5045,23 @@ body[data-theme="blue"] { background:#0b1220 !important; }
     const key = `numix_recovery_${label}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     if (typeof indexedDB !== 'undefined') {
       const saved = await new Promise(resolve => {
-        let request;
+        let request,settled=false;
+        const finish = saved => { if (settled) return; settled=true; clearTimeout(timer); resolve(saved); };
+        const timer = setTimeout(() => finish(false), 5000);
         try { request = indexedDB.open('numix_progress_recovery', 1); }
-        catch (_) { resolve(false); return; }
+        catch (_) { finish(false); return; }
         request.onupgradeneeded = () => request.result.createObjectStore('snapshots');
-        request.onerror = () => resolve(false);
+        request.onerror = () => finish(false);
+        request.onblocked = () => finish(false);
         request.onsuccess = () => {
           const db = request.result;
+          if (settled) { db.close(); return; }
           let transaction;
           try { transaction = db.transaction('snapshots', 'readwrite'); transaction.objectStore('snapshots').put({ label, savedAt: Date.now(), value }, key); }
-          catch (_) { db.close(); resolve(false); return; }
-          transaction.oncomplete = () => { db.close(); resolve(true); };
-          transaction.onerror = () => { db.close(); resolve(false); };
-          transaction.onabort = () => { db.close(); resolve(false); };
+          catch (_) { db.close(); finish(false); return; }
+          transaction.oncomplete = () => { db.close(); finish(true); };
+          transaction.onerror = () => { db.close(); finish(false); };
+          transaction.onabort = () => { db.close(); finish(false); };
         };
       });
       if (saved) return true;
@@ -5140,6 +5150,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
   };
 
   App.prototype.showCloudConflict = function (profile, items, userId) {
+    this.stopAutoClicker();
     this._cloudReady = false;
     clearTimeout(this._cloudDebounce);
     this._pendingCloudProfile = profile;
@@ -5225,7 +5236,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
     }
   };
 
-  App.prototype._saveUserDataToCloudOnce = async function (userId) {
+  App.prototype._saveUserDataToCloudOnce = async function (userId, retriedRevision = false) {
     if (!supabaseClient || !this._cloudReady || !userId || this.state.cloudUser?.id !== userId)
       throw new Error('Облачная синхронизация не готова.');
     const { data: verified, error: authError } = await supabaseClient.auth.getUser();
@@ -5235,19 +5246,32 @@ body[data-theme="blue"] { background:#0b1220 !important; }
     if (hash === this._lastCloudHash) { this._cloudDirty = false; return true; }
     const items = this.cloudItemsForSave();
     if (items.length !== payload.state.collection.length) throw new Error('В коллекции есть повторяющиеся или пустые ID. Сохранение остановлено.');
-    const { data, error } = await supabaseClient.rpc('save_numix_progress', {
-      p_expected_revision: this._cloudRevision, p_state: payload, p_items: items
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    let data, error;
+    try {
+      const request = supabaseClient.rpc('save_numix_progress', {
+        p_expected_revision: this._cloudRevision, p_state: payload, p_items: items
+      });
+      ({ data, error } = await (typeof request.abortSignal === 'function' ? request.abortSignal(controller.signal) : request));
+    } finally { clearTimeout(timeout); }
     if (error) {
       if (String(error.message || '').includes('save_revision_conflict')) {
         const remote = await this.fetchCloudRecords(userId);
-        if (remote.profile?.data && this.cloudPayloadHash(remote.profile.data) === hash) {
+        if (!remote.profile) throw new Error('Облачный профиль временно недоступен.');
+        const remoteState = this.cloudPayloadFromRecords(remote.profile, remote.items);
+        const remoteHash = remoteState ? this.cloudPayloadHash(remoteState.payload) : null;
+        if (remoteHash === hash) {
           this._cloudRevision = Number(remote.profile.save_revision || 0);
           this._lastCloudHash = hash;
           try { localStorage.setItem(META_KEY, JSON.stringify({ userId, revision: this._cloudRevision, hash })); } catch (_) {}
           this._cloudDirty = this.cloudPayloadHash(this.makeCloudPayload()) !== this._lastCloudHash;
           if (this._cloudDirty) this.queueCloudSync();
           return true;
+        }
+        if (!retriedRevision && remoteHash && remoteHash === this._lastCloudHash && !remoteState.externalChanges) {
+          this._cloudRevision = Number(remote.profile.save_revision || 0);
+          return this._saveUserDataToCloudOnce(userId, true);
         }
         this.showCloudConflict(remote.profile, remote.items, userId);
       }
@@ -5293,8 +5317,9 @@ body[data-theme="blue"] { background:#0b1220 !important; }
     try {
       const current = await this.fetchCloudRecords(userId);
       if (!current.profile) throw new Error('Облачное сохранение недоступно. Повторите попытку при подключении к сети.');
-      if (Number(current.profile?.save_revision || 0) !== Number(this._pendingCloudProfile?.save_revision || 0)
-          || current.profile?.updated_at !== this._pendingCloudProfile?.updated_at) {
+      const pendingHash = this.cloudPayloadHash(this.cloudPayloadFromRecords(this._pendingCloudProfile, this._pendingCloudItems).payload);
+      const currentHash = this.cloudPayloadHash(this.cloudPayloadFromRecords(current.profile, current.items).payload);
+      if (currentHash !== pendingHash) {
         this.showCloudConflict(current.profile, current.items, userId);
         return this.setConflictStatus('Облако изменилось. Проверьте данные и выберите вариант ещё раз.');
       }
@@ -5307,6 +5332,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
       await this.saveUserDataToCloud(userId);
       document.getElementById('conflictModal').style.display = 'none';
       this.setConflictStatus();
+      void window.numixProgress?.flush?.();
       this.showToast('Прогресс устройства сохранён в облаке.', 'success');
     } catch (error) { console.error('Keep local:', error); this._cloudReady = false; this.setConflictStatus(error?.message || 'Не удалось сохранить прогресс устройства. Повторите попытку.'); }
   };
@@ -5318,8 +5344,9 @@ body[data-theme="blue"] { background:#0b1220 !important; }
       const userId = this._pendingCloudUserId || this.state.cloudUser?.id;
       const current = await this.fetchCloudRecords(userId);
       if (!current.profile) throw new Error('Облачное сохранение недоступно. Повторите попытку при подключении к сети.');
-      if (Number(current.profile.save_revision || 0) !== Number(this._pendingCloudProfile.save_revision || 0)
-          || current.profile.updated_at !== this._pendingCloudProfile.updated_at) {
+      const pendingHash = this.cloudPayloadHash(this.cloudPayloadFromRecords(this._pendingCloudProfile, this._pendingCloudItems).payload);
+      const currentHash = this.cloudPayloadHash(this.cloudPayloadFromRecords(current.profile, current.items).payload);
+      if (currentHash !== pendingHash) {
         this.showCloudConflict(current.profile, current.items, userId);
         return this.setConflictStatus('Облако изменилось. Проверьте данные и выберите вариант ещё раз.');
       }
@@ -5328,6 +5355,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
       this.applyCloudData(current.profile, current.items);
       document.getElementById('conflictModal').style.display = 'none';
       this.setConflictStatus();
+      void window.numixProgress?.flush?.();
       this.showToast('Весь прогресс загружен из облака.', 'success');
     } catch (error) { console.error('Keep cloud:', error); this.setConflictStatus(error?.message || 'Не удалось загрузить прогресс. Повторите попытку.'); }
   };
@@ -6080,6 +6108,7 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
     if(id)try{localStorage.removeItem(`numix_pending_lucky_spin_${id}`);}catch(_){}
     owner=id;events=[];
     if(id)try{const saved=JSON.parse(localStorage.getItem(storageKey(id))||'[]');if(Array.isArray(saved))events=saved;}catch(_){}
+    if(events.length&&ready())scheduleFlush();
   }
   function render(){
     const d=state||DEFAULT,level=Number(d.level||1),needed=Math.max(1,Number(d.xp_needed||150)),inside=Number(d.xp_into_level||0);
@@ -6128,12 +6157,19 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
   function queue(kind,source_id,rarity){
     useOwner();if(!ready()||!source_id)return;
     events.push({kind,source_id:String(source_id),rarity:rarity||null});
-    persist();clearTimeout(flushTimer);flushTimer=setTimeout(flush,1200);
+    persist();scheduleFlush();
   }
   let progressBackoffUntil=0;
+  function scheduleFlush(delay=1200){
+    if(flushTimer||!ready()||!events.length)return;
+    flushTimer=setTimeout(()=>{flushTimer=null;void flush();},Math.max(0,delay));
+  }
   function flush(){
     useOwner();if(flushTask)return flushTask;
-    if(!ready()||!events.length||Date.now()<progressBackoffUntil)return Promise.resolve();
+    if(!ready()||!events.length)return Promise.resolve();
+    if(Date.now()<progressBackoffUntil){scheduleFlush(progressBackoffUntil-Date.now());return Promise.resolve();}
+    if(flushTimer){clearTimeout(flushTimer);flushTimer=null;}
+    let retryDelay=1200;
     flushTask=(async()=>{try{
       while(ready()&&events.length){
         const batchOwner=owner;
@@ -6164,9 +6200,9 @@ const ROULETTE_SRC = new TextDecoder().decode(Uint8Array.from(atob("PCFET0NUWVBF
       console.warn('Progress event sync:',error);
       const rateLimited=/spin_rate_limit/.test(String(error?.message||''));
       if(rateLimited)progressBackoffUntil=Date.now()+61000;
-      setTimeout(flush,rateLimited?61000:5000);
+      retryDelay=rateLimited?61000:5000;
     }
-    finally{flushTask=null;}})();
+    finally{flushTask=null;if(events.length) scheduleFlush(retryDelay);}})();
     return flushTask;
   }
   const progress={
