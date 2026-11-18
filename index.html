@@ -919,14 +919,14 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 </div>
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-fuchsia-400"></span><span class="text-sm font-semibold text-fuchsia-300">Секретный</span></div>
-                    <span class="text-sm font-black text-white">1 из 236 311</span>
+                    <span id="secret-drop-odds" class="text-sm font-black text-white"></span>
                 </div>
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-black border border-white/30"></span><span class="text-sm font-semibold text-white">&₽@?#%! — BLACK</span></div>
-                    <span class="text-sm font-black text-white">1 из 450 000</span>
+                    <span id="black-drop-odds" class="text-sm font-black text-white"></span>
                 </div>
             </div>
-            <p class="text-[10px] leading-relaxed text-slate-500 px-1">Шансы для обычных–мифических номеров указаны по заданным игровым значениям. Для экзотических и секретных серий показана оценка по весам их выпадения в пуле номеров.</p>
+            <p class="text-[10px] leading-relaxed text-slate-500 px-1">Шансы для обычных–мифических номеров указаны по заданным игровым значениям. Для экзотической серии показана оценка по весу в пуле номеров. Шансы секретного номера и BLACK заданы точно для каждой прокрутки.</p>
         </section>
 
         <!-- SECTION: CURRENCY EXCHANGE -->
@@ -1583,15 +1583,19 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             // Сверхредкие экзотические серии
             { code: 'MYTH', country: 'Мифический (+880)', flag: '🌐', pattern: '+880 XXXX XXXX', formatDigits: 8, dropWeight: 0.001, forceRarity: 'mythic' },
             { code: 'ULT', country: 'Telegram (+888)', flag: '🌐', pattern: '+888 XXXX XXXX', formatDigits: 8, dropWeight: 0.003, forceRarity: 'ultra' },
-            // BLACK rarity test drop: same nominal probability as Epic (1/150).
+            // Special rarities use the exact odds below, outside the weighted country pool.
             { code: 'BLACK_ZERO', country: 'BLACK (+0)', flag: '✦', pattern: '+0 0000 0000', formatDigits: 0, dropWeight: 0, forceRarity: 'black' },
 
-            // Секретные номера для ивента: шанс снижен в 10 раз (общий вес 0.00036%)
-            { code: 'SECRET_RU', country: 'Россия', flag: '🇷🇺', pattern: '+7 777 777 7777', formatDigits: 10, dropWeight: 0.00009, forceRarity: 'secret' },
-            { code: 'SECRET_MR', country: 'Мавритания', flag: '🇲🇷', pattern: '+222 22222222', formatDigits: 8, dropWeight: 0.00009, forceRarity: 'secret' },
-            { code: 'SECRET_US', country: 'США', flag: '🇺🇸', pattern: '+1 111 111 1111', formatDigits: 10, dropWeight: 0.00009, forceRarity: 'secret' },
-            { code: 'SECRET_UK', country: 'Великобритания', flag: '🇬🇧', pattern: '+44 444 444444', formatDigits: 9, dropWeight: 0.00009, forceRarity: 'secret' }
+            { code: 'SECRET_RU', country: 'Россия', flag: '🇷🇺', pattern: '+7 777 777 7777', formatDigits: 10, dropWeight: 0, forceRarity: 'secret' },
+            { code: 'SECRET_MR', country: 'Мавритания', flag: '🇲🇷', pattern: '+222 22222222', formatDigits: 8, dropWeight: 0, forceRarity: 'secret' },
+            { code: 'SECRET_US', country: 'США', flag: '🇺🇸', pattern: '+1 111 111 1111', formatDigits: 10, dropWeight: 0, forceRarity: 'secret' },
+            { code: 'SECRET_UK', country: 'Великобритания', flag: '🇬🇧', pattern: '+44 444 444444', formatDigits: 9, dropWeight: 0, forceRarity: 'secret' }
         ];
+        const SPECIAL_DROP_ODDS = Object.freeze({ black: 111111, secret: 74444 });
+        for (const rarity of ['secret', 'black']) {
+            document.getElementById(`${rarity}-drop-odds`).textContent =
+                `1 из ${SPECIAL_DROP_ODDS[rarity].toLocaleString('ru-RU')}`;
+        }
 
         // -------------------------------------------------------------
         // MODULE 2: RARITY ENGINE
@@ -1745,12 +1749,18 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
         class NumberGenerator {
             static getRandomPlan() {
-                // One independent BLACK draw per generated number: exactly 1 in 450,000.
-                if (Math.random() < 1 / 450000) return PHONE_PLANS.find(plan => plan.code === 'BLACK_ZERO');
+                // Disjoint intervals give exact unconditional odds per generated number.
+                const specialRoll = Math.random();
+                if (specialRoll < 1 / SPECIAL_DROP_ODDS.black)
+                    return PHONE_PLANS.find(plan => plan.code === 'BLACK_ZERO');
+                if (specialRoll < 1 / SPECIAL_DROP_ODDS.black + 1 / SPECIAL_DROP_ODDS.secret) {
+                    const secretPlans = PHONE_PLANS.filter(plan => plan.forceRarity === 'secret');
+                    return secretPlans[Math.floor(Math.random() * secretPlans.length)];
+                }
                 const rand = Math.random() * 100;
                 let cumulative = 0;
                 for (const plan of PHONE_PLANS) {
-                    if (plan.code === 'BLACK_ZERO') continue;
+                    if (plan.forceRarity === 'black' || plan.forceRarity === 'secret') continue;
                     cumulative += plan.dropWeight;
                     if (rand <= cumulative) return plan;
                 }
