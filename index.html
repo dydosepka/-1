@@ -1631,7 +1631,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 for (const key of ['secret','black']) {
                     const element=document.getElementById(`${key}-drop-odds`);
                     if (element) element.textContent = this.mode === 'standard'
-                        ? `1 из ${SPECIAL_DROP_ODDS[key].toLocaleString('ru-RU')}` : this.format(key);
+                        ? `1 из ${Math.round(100/Number(this.effective?.[key] || 100/SPECIAL_DROP_ODDS[key])).toLocaleString('ru-RU')}` : this.format(key);
                 }
                 window.app?.adminRenderChances?.();
             },
@@ -1846,9 +1846,11 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             static getRandomPlan() {
                 // Disjoint intervals give exact unconditional odds per generated number.
                 const specialRoll = Math.random();
-                if (specialRoll < 1 / SPECIAL_DROP_ODDS.black)
+                const blackChance = Number(dropSettings.effective?.black ?? 100/SPECIAL_DROP_ODDS.black)/100;
+                const secretChance = Number(dropSettings.effective?.secret ?? 100/SPECIAL_DROP_ODDS.secret)/100;
+                if (specialRoll < blackChance)
                     return PHONE_PLANS.find(plan => plan.code === 'BLACK_ZERO');
-                if (specialRoll < 1 / SPECIAL_DROP_ODDS.black + 1 / SPECIAL_DROP_ODDS.secret) {
+                if (specialRoll < blackChance + secretChance) {
                     const secretPlans = PHONE_PLANS.filter(plan => plan.forceRarity === 'secret');
                     return secretPlans[Math.floor(Math.random() * secretPlans.length)];
                 }
