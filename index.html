@@ -891,31 +891,31 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             <div class="rounded-2xl overflow-hidden border border-white/10 bg-[#191919] divide-y divide-white/10">
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-slate-400"></span><span class="text-sm font-semibold text-slate-300">Обычный</span></div>
-                    <span class="text-sm font-black text-white">83 %</span>
+                    <span id="chance-common" class="text-sm font-black text-white">83 %</span>
                 </div>
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-sm font-semibold text-emerald-400">Необычный</span></div>
-                    <span class="text-sm font-black text-white">13 %</span>
+                    <span id="chance-uncommon" class="text-sm font-black text-white">13 %</span>
                 </div>
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-blue-500"></span><span class="text-sm font-semibold text-blue-400">Редкий</span></div>
-                    <span class="text-sm font-black text-white">3,3 %</span>
+                    <span id="chance-rare" class="text-sm font-black text-white">3,3 %</span>
                 </div>
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-purple-400"></span><span class="text-sm font-semibold text-purple-400">Эпический</span></div>
-                    <span class="text-sm font-black text-white">1 из 150</span>
+                    <span id="chance-epic" class="text-sm font-black text-white">1 из 150</span>
                 </div>
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-orange-400"></span><span class="text-sm font-semibold text-orange-400">Легендарный</span></div>
-                    <span class="text-sm font-black text-white">1 из 510</span>
+                    <span id="chance-legendary" class="text-sm font-black text-white">1 из 510</span>
                 </div>
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-red-500"></span><span class="text-sm font-semibold text-red-400">Мифический</span></div>
-                    <span class="text-sm font-black text-white">1 из 10 008</span>
+                    <span id="chance-mythic" class="text-sm font-black text-white">1 из 10 008</span>
                 </div>
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-cyan-400"></span><span class="text-sm font-semibold text-cyan-300">Экзотический (+888)</span></div>
-                    <span class="text-sm font-black text-white">1 из 28 357</span>
+                    <span id="chance-ultra" class="text-sm font-black text-white">1 из 28 357</span>
                 </div>
                 <div class="flex items-center justify-between px-4 py-3.5">
                     <div class="flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-fuchsia-400"></span><span class="text-sm font-semibold text-fuchsia-300">Секретный</span></div>
@@ -926,7 +926,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     <span id="black-drop-odds" class="text-sm font-black text-white"></span>
                 </div>
             </div>
-            <p class="text-[10px] leading-relaxed text-slate-500 px-1">Шансы для обычных–мифических номеров указаны по заданным игровым значениям. Для экзотической серии показана оценка по весу в пуле номеров. Шансы секретного номера и BLACK заданы точно для каждой прокрутки.</p>
+            <p id="chance-description" class="text-[10px] leading-relaxed text-slate-500 px-1">Шансы для обычных–мифических номеров указаны по заданным игровым значениям. Для экзотической серии показана оценка по весу в пуле номеров. Шансы секретного номера и BLACK заданы точно для каждой прокрутки.</p>
         </section>
 
         <!-- SECTION: CURRENCY EXCHANGE -->
@@ -1327,7 +1327,11 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 </button>
             </div>
 
-            <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-2 text-xs font-bold">
+                <button id="admin-tab-general" type="button" onclick="app.adminSwitchPanel('general')" class="rounded-xl px-3 py-2.5 bg-amber-500 text-slate-950">Управление</button>
+                <button id="admin-tab-chances" type="button" onclick="app.adminSwitchPanel('chances')" class="rounded-xl px-3 py-2.5 glass-panel text-white">🎯 Настройка шансов</button>
+            </div>
+            <div id="admin-pane-general" class="space-y-4">
                 <!-- TARGET PLAYER BY ID -->
                 <div class="glass-panel p-3.5 rounded-xl border border-cyan-500/40 space-y-3 bg-cyan-950/20">
                     <p class="text-[11px] text-cyan-300 font-bold uppercase tracking-wider"><i class="fa-solid fa-fingerprint mr-1"></i>Награда игроку по ID</p>
@@ -1458,6 +1462,13 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                     <span><i class="fa-solid fa-trash mr-2"></i>Очистить всю коллекцию</span>
                     <i class="fa-solid fa-circle-exclamation text-rose-400"></i>
                 </button>
+            </div>
+            <div id="admin-pane-chances" class="hidden space-y-3">
+                <p class="text-xs text-slate-400">Укажите веса в процентах. После сохранения сумма будет приведена к 100%. Навыки игрока применяются отдельно.</p>
+                <div id="admin-chance-fields" class="space-y-2"></div>
+                <p id="admin-chance-status" class="text-xs text-slate-400" role="status"></p>
+                <button id="admin-chance-save" type="button" onclick="app.adminSaveChances()" class="w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 font-extrabold text-xs">Сохранить изменения</button>
+                <button id="admin-chance-reset" type="button" onclick="app.adminResetChances()" class="w-full py-2.5 rounded-xl glass-panel text-white font-extrabold text-xs">Сбросить к стандартным</button>
             </div>
         </div>
     </div>
@@ -1592,6 +1603,77 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             { code: 'SECRET_UK', country: 'Великобритания', flag: '🇬🇧', pattern: '+44 444 444444', formatDigits: 9, dropWeight: 0, forceRarity: 'secret' }
         ];
         const SPECIAL_DROP_ODDS = Object.freeze({ black: 111111, secret: 74444 });
+        const DROP_KEYS = ['common','uncommon','rare','epic','legendary','mythic','ultra','secret','black'];
+        const STANDARD_CHANCE_LABELS = ['83 %','13 %','3,3 %','1 из 150','1 из 510','1 из 10 008','1 из 28 357'];
+        const dropSettings = {
+            ready: !supabaseClient, mode: 'standard', weights: null, effective: null, version: 0, loading: null,
+            apply(row) {
+                if (!row || !['standard','custom'].includes(row.mode) || !row.effective) return false;
+                const values = DROP_KEYS.map(key => Number(row.effective[key]));
+                if (values.some(value => !Number.isFinite(value) || value < 0 || value > 100)
+                    || Math.abs(values.reduce((sum,value) => sum + value,0) - 100) > 0.000001) return false;
+                this.mode = row.mode; this.weights = row.weights; this.effective = row.effective;
+                this.version = Number(row.version || 0); this.ready = true;
+                this.render();
+                try { localStorage.setItem('numix_drop_settings_v1', JSON.stringify(row)); } catch (_) {}
+                return true;
+            },
+            render() {
+                const description=document.getElementById('chance-description');
+                if (description) description.textContent=this.mode==='standard'
+                    ? 'Шансы для обычных–мифических номеров указаны по заданным игровым значениям. Для экзотической серии показана оценка по весу в пуле номеров. Шансы секретного номера и BLACK заданы точно для каждой прокрутки.'
+                    : 'Показаны глобальные шансы после нормализации. Навыки игрока могут дополнительно повысить шансы эпических, легендарных и мифических номеров.';
+                for (let i=0;i<7;i++) {
+                    const key=DROP_KEYS[i], element=document.getElementById(`chance-${key}`);
+                    if (!element) continue;
+                    element.textContent = this.mode === 'standard' ? STANDARD_CHANCE_LABELS[i] : this.format(key);
+                }
+                for (const key of ['secret','black']) {
+                    const element=document.getElementById(`${key}-drop-odds`);
+                    if (element) element.textContent = this.mode === 'standard'
+                        ? `1 из ${SPECIAL_DROP_ODDS[key].toLocaleString('ru-RU')}` : this.format(key);
+                }
+                window.app?.adminRenderChances?.();
+            },
+            format(key) {
+                const percent = Number(this.effective?.[key] || 0);
+                if (percent === 0) return '0 %';
+                if (DROP_KEYS.indexOf(key) >= 3) return `1 из ${Math.round(100/percent).toLocaleString('ru-RU')}`;
+                return `${percent.toLocaleString('ru-RU',{maximumFractionDigits:6})} %`;
+            },
+            async load() {
+                if (!supabaseClient || this.loading) return this.loading;
+                this.loading = (async () => {
+                    const controller = new AbortController(), timer = setTimeout(() => controller.abort(),12000);
+                    try {
+                        const query=supabaseClient.from('numix_drop_chances').select('*').eq('id',1).single();
+                        const {data,error}=await query.abortSignal(controller.signal);
+                        if (error || !this.apply(data)) throw error || new Error('invalid_drop_settings');
+                    } catch (error) {
+                        console.warn('Drop settings load:',error);
+                        if (!this.ready) {
+                            try { this.apply(JSON.parse(localStorage.getItem('numix_drop_settings_v1') || 'null')); } catch (_) {}
+                            if (!this.ready) { this.mode='standard'; this.ready=true; this.render(); }
+                        }
+                    } finally { clearTimeout(timer); this.loading=null; }
+                })();
+                return this.loading;
+            },
+            rollRarity() {
+                const probabilities = DROP_KEYS.map(key => Number(this.effective[key]));
+                const bonus = Math.min(1.15, window.numixProgress?.ordinaryLuckFactor?.() || 1);
+                const affected = [3,4,5], extra = affected.reduce((sum,index) => sum + probabilities[index]*(bonus-1),0);
+                const share = extra > 0 ? Math.min(1,probabilities[0]/extra) : 0;
+                for (const index of affected) probabilities[index] *= 1+(bonus-1)*share;
+                probabilities[0] -= extra*share;
+                const roll=Math.random()*100;
+                let cumulative=0;
+                for (let i=0;i<DROP_KEYS.length;i++) {
+                    cumulative += probabilities[i];
+                    if (roll < cumulative || i === DROP_KEYS.length-1) return DROP_KEYS[i];
+                }
+            }
+        };
         for (const rarity of ['secret', 'black']) {
             document.getElementById(`${rarity}-drop-odds`).textContent =
                 `1 из ${SPECIAL_DROP_ODDS[rarity].toLocaleString('ru-RU')}`;
@@ -1748,6 +1830,19 @@ body[data-theme="blue"] { background:#0b1220 !important; }
         }
 
         class NumberGenerator {
+            static getConfiguredPlan(rarity) {
+                if (rarity === 'black') return PHONE_PLANS.find(plan => plan.code === 'BLACK_ZERO');
+                if (rarity === 'secret') {
+                    const plans=PHONE_PLANS.filter(plan => plan.forceRarity === 'secret');
+                    return plans[Math.floor(Math.random()*plans.length)];
+                }
+                if (rarity === 'ultra') return PHONE_PLANS.find(plan => plan.code === 'ULT');
+                const plans=PHONE_PLANS.filter(plan => !plan.forceRarity);
+                const total=plans.reduce((sum,plan) => sum+plan.dropWeight,0);
+                let roll=Math.random()*total;
+                for (const plan of plans) { roll-=plan.dropWeight; if (roll < 0) return plan; }
+                return plans[0];
+            }
             static getRandomPlan() {
                 // Disjoint intervals give exact unconditional odds per generated number.
                 const specialRoll = Math.random();
@@ -1768,7 +1863,8 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             }
 
             static generate() {
-                const plan = this.getRandomPlan();
+                const configuredRarity = dropSettings.mode === 'custom' ? dropSettings.rollRarity() : null;
+                const plan = configuredRarity ? this.getConfiguredPlan(configuredRarity) : this.getRandomPlan();
 
                 let rawDigits = '';
                 for (let i = 0; i < plan.formatDigits; i++) {
@@ -1784,6 +1880,12 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 });
 
                 const analysis = PriceEstimator.analyze(rawDigits, plan);
+                if (configuredRarity && analysis.rarityKey !== configuredRarity) {
+                    const rarity=RARITIES[configuredRarity];
+                    analysis.rarityKey=configuredRarity;
+                    analysis.rarity=rarity;
+                    analysis.finalPrice=Math.round(rarity.minPrice+Math.random()*(rarity.maxPrice-rarity.minPrice));
+                }
 
                 return {
                     id: 'num_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -3207,6 +3309,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
 
             handleTapToOpen() {
                 if (this.isRevealing || this.isAutoClickerEnabled || this.activeTab !== 'generator' || document.hidden) return;
+                if (!dropSettings.ready) return this.showToast('Загружаем настройки шансов. Повторите прокрутку через секунду.', 'info');
 
                 const maxCap = window.numixProgress?.capacity(this.state.upgrades.maxCapacity || 50) || this.state.upgrades.maxCapacity || 50;
                 if (this.state.collection.length >= maxCap) {
@@ -3447,6 +3550,7 @@ body[data-theme="blue"] { background:#0b1220 !important; }
             startAutoClickerLoop() {
                 if (this.autoClickerInterval) clearInterval(this.autoClickerInterval);
                 if (!this.isAutoClickerEnabled || this.activeTab !== 'generator' || document.hidden) { this.stopAutoClicker(); return; }
+                if (!dropSettings.ready) { this.stopAutoClicker(); return this.showToast('Настройки шансов ещё загружаются.', 'info'); }
                 const btn = document.getElementById('btn-auto-click');
                 const autoClicksPerSec = window.numixProgress?.autoRate(this.state.upgrades.autoSpeed) || Math.min(15, Math.max(1, this.state.upgrades.autoSpeed));
                 // Run in small batches with fractional pacing to respect the selected clicks/second.
@@ -4863,6 +4967,9 @@ body[data-theme="blue"] { background:#0b1220 !important; }
                 });
             }
             window.app = app;
+            void dropSettings.load();
+            setInterval(() => { if (!document.hidden) void dropSettings.load(); }, 30000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) void dropSettings.load(); });
             window.adminGiveRewardToPlayer = (...args) => app.adminGiveRewardToPlayer(...args);
             app.init();
             document.addEventListener('visibilitychange', () => { if (document.hidden) app.stopAutoClicker(); });
@@ -5634,9 +5741,106 @@ body[data-theme="blue"] { background:#0b1220 !important; }
   App.prototype.toggleAdminPanelModal = function () {
     oldToggleAdminPanelModal.call(this);
     if (!document.getElementById('admin-panel-modal')?.classList.contains('hidden')) {
+      this.adminSwitchPanel('general');
       this.adminUpdateNumberPlans();
       this.adminLoadNumberHistory();
     }
+  };
+
+  App.prototype.adminSwitchPanel = function (tab) {
+    for (const name of ['general','chances']) {
+      const selected=name===tab;
+      document.getElementById(`admin-pane-${name}`).classList.toggle('hidden',!selected);
+      const button=document.getElementById(`admin-tab-${name}`);
+      button.classList.toggle('bg-amber-500',selected);
+      button.classList.toggle('text-slate-950',selected);
+      button.classList.toggle('glass-panel',!selected);
+      button.classList.toggle('text-white',!selected);
+    }
+    if (tab==='chances') { this._adminChanceEditing=false; this.adminRenderChances(); void dropSettings.load(); }
+  };
+  App.prototype.adminRenderChances = function () {
+    const pane=document.getElementById('admin-pane-chances');
+    if (!pane || pane.classList.contains('hidden') || this._adminChanceEditing) return;
+    const holder=document.getElementById('admin-chance-fields');
+    const status=document.getElementById('admin-chance-status');
+    holder.replaceChildren();
+    if (!dropSettings.ready || !dropSettings.weights) {
+      status.textContent='Загружаем настройки из Supabase…';
+      return;
+    }
+    for (const key of DROP_KEYS) {
+      const row=document.createElement('label');
+      row.className='glass-panel rounded-xl p-2.5 flex items-center gap-2 text-xs text-white';
+      const name=document.createElement('span');
+      name.className='min-w-0 flex-1 font-bold';
+      name.textContent=RARITIES[key].name;
+      const input=document.createElement('input');
+      input.type='number'; input.min='0'; input.max='100'; input.step='any';
+      input.dataset.chanceKey=key;
+      input.value=String(Number(dropSettings.weights[key]));
+      input.className='w-28 max-w-[38%] bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-right text-white font-mono';
+      input.addEventListener('input',() => { this._adminChanceEditing=true; this.adminPreviewChances(); });
+      const unit=document.createElement('span');unit.textContent='%';
+      row.append(name,input,unit);
+      const actual=document.createElement('small');
+      actual.dataset.actualChance=key;
+      actual.className='block text-[10px] text-slate-400 mt-1';
+      const wrap=document.createElement('div');wrap.append(row,actual);holder.appendChild(wrap);
+    }
+    this.adminPreviewChances();
+  };
+  App.prototype.adminPreviewChances = function () {
+    const inputs=[...document.querySelectorAll('#admin-chance-fields input[data-chance-key]')];
+    if (inputs.length!==DROP_KEYS.length) return;
+    const values=Object.fromEntries(inputs.map(input=>[input.dataset.chanceKey,Number(input.value)]));
+    const valid=inputs.every(input=>input.value!=='' && Number.isFinite(Number(input.value))
+      && Number(input.value)>=0 && Number(input.value)<=100);
+    const total=Object.values(values).reduce((sum,value)=>sum+value,0);
+    const status=document.getElementById('admin-chance-status');
+    const save=document.getElementById('admin-chance-save');
+    save.disabled=!valid || total<=0;
+    if (!valid || total<=0) { status.textContent='Укажите числа от 0 до 100; сумма должна быть больше нуля.'; return; }
+    status.textContent=dropSettings.mode==='standard' && !this._adminChanceEditing
+      ? 'Стандартный алгоритм: обычные–экзотические значения являются оценками; секретный и BLACK заданы точно.'
+      : `Сумма весов: ${total.toLocaleString('ru-RU',{maximumFractionDigits:6})}%. Фактические шансы после нормализации:`;
+    for (const key of DROP_KEYS) {
+      const percent=values[key]*100/total;
+      const text=percent===0?'0 %':`${percent.toLocaleString('ru-RU',{maximumFractionDigits:8})} %`;
+      const odds=percent>0 && DROP_KEYS.indexOf(key)>=3 ? ` · 1 из ${Math.round(100/percent).toLocaleString('ru-RU')}` : '';
+      const actualLabel=document.querySelector(`[data-actual-chance="${key}"]`);
+      actualLabel.textContent=`После нормализации: ${text}${odds}`;
+    }
+    return values;
+  };
+  App.prototype.adminSaveChances = async function () {
+    const values=this.adminPreviewChances();
+    if (!values || this._adminChanceBusy) return;
+    this._adminChanceBusy=true;
+    const button=document.getElementById('admin-chance-save');button.disabled=true;
+    try {
+      const {data,error}=await supabaseClient.rpc('numix_admin_set_drop_chances',{p_weights:values,p_reset:false});
+      if (error || !dropSettings.apply(data)) throw error || new Error('invalid_drop_settings');
+      this._adminChanceEditing=false;this.adminRenderChances();
+      this.showToast('Шансы сохранены и применены.', 'success');
+    } catch (error) {
+      console.error('Admin drop chances:',error);
+      this.showToast(error?.message?.includes('admin_required')?'Нет прав администратора.':'Не удалось сохранить шансы. Проверьте значения и соединение.','error');
+    } finally { this._adminChanceBusy=false; this.adminPreviewChances(); }
+  };
+  App.prototype.adminResetChances = async function () {
+    if (this._adminChanceBusy || !confirm('Сбросить шансы всех редкостей к стандартным для всех игроков?')) return;
+    this._adminChanceBusy=true;
+    const button=document.getElementById('admin-chance-reset');button.disabled=true;
+    try {
+      const {data,error}=await supabaseClient.rpc('numix_admin_set_drop_chances',{p_reset:true});
+      if (error || !dropSettings.apply(data)) throw error || new Error('invalid_drop_settings');
+      this._adminChanceEditing=false;this.adminRenderChances();
+      this.showToast('Стандартные шансы восстановлены.', 'success');
+    } catch (error) {
+      console.error('Admin reset drop chances:',error);
+      this.showToast('Не удалось сбросить шансы. Попробуйте ещё раз.','error');
+    } finally { this._adminChanceBusy=false; button.disabled=false; }
   };
 
   App.prototype.adminCreatePromocode = async function () {
